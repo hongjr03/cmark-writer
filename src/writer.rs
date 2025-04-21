@@ -144,7 +144,7 @@ impl CommonMarkWriter {
 
     /// Write a heading node
     fn write_heading(&mut self, level: u8, content: &[Node]) -> fmt::Result {
-        if level < 1 || level > 6 {
+        if !(1..=6).contains(&level) {
             return Err(fmt::Error);
         }
 
@@ -434,6 +434,12 @@ impl CommonMarkWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.buffer.push_str(s);
         Ok(())
+    }
+}
+
+impl Default for CommonMarkWriter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -8,7 +8,7 @@
 pub enum Node {
     /// Root document node, containing child nodes
     Document(Vec<Node>),
-    
+
     /// Heading, containing level (1-6) and content
     Heading {
         /// Heading level, 1-6
@@ -16,13 +16,13 @@ pub enum Node {
         /// Heading content, containing inline elements
         content: Vec<Node>,
     },
-    
+
     /// Paragraph node, containing inline elements
     Paragraph(Vec<Node>),
-    
+
     /// Block quote, containing any block-level elements
     BlockQuote(Vec<Node>),
-    
+
     /// Code block, containing optional language identifier and content
     CodeBlock {
         /// Optional language identifier
@@ -30,10 +30,10 @@ pub enum Node {
         /// Code content
         content: String,
     },
-    
+
     /// Unordered list, containing list items
     UnorderedList(Vec<ListItem>),
-    
+
     /// Ordered list, containing starting number and list items
     OrderedList {
         /// List starting number
@@ -41,10 +41,10 @@ pub enum Node {
         /// List items
         items: Vec<ListItem>,
     },
-    
+
     /// Thematic break (horizontal rule)
     ThematicBreak,
-    
+
     /// Table
     Table {
         /// Header cells
@@ -54,7 +54,7 @@ pub enum Node {
         /// Column alignments
         alignments: Vec<Alignment>,
     },
-    
+
     /// Link
     Link {
         /// Link URL
@@ -64,7 +64,7 @@ pub enum Node {
         /// Link text content
         content: Vec<Node>,
     },
-    
+
     /// Image
     Image {
         /// Image URL
@@ -74,25 +74,25 @@ pub enum Node {
         /// Image alt text
         alt: String,
     },
-    
+
     /// Emphasis (italic)
     Emphasis(Vec<Node>),
-    
+
     /// Strong emphasis (bold)
     Strong(Vec<Node>),
-    
+
     /// Inline code
     InlineCode(String),
-    
+
     /// Plain text
     Text(String),
-    
+
     /// HTML block
     Html(String),
-    
+
     /// Soft line break (single newline)
     SoftBreak,
-    
+
     /// Hard line break (two spaces followed by newline or backslash followed by newline)
     HardBreak,
 }

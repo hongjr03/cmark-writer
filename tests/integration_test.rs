@@ -15,12 +15,12 @@ fn test_simple_document() {
             Node::Text(" regular text".to_string()),
         ]),
     ]);
-    
+
     // Write as CommonMark
     let mut writer = CommonMarkWriter::new();
     writer.write(&document).expect("Failed to write document");
     let result = writer.into_string();
-    
+
     // Verify result, note that spacing handling is fixed
     let expected = "# Title\n\nRegular text **bold text** regular text";
     assert_eq!(result, expected);
@@ -51,11 +51,11 @@ fn test_complex_document() {
             content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
         },
     ]);
-    
+
     let mut writer = CommonMarkWriter::new();
     writer.write(&document).expect("Failed to write document");
     let result = writer.into_string();
-    
+
     let expected = "## List Example\n\n- Item 1\n- [x] Item 2\n\n```rust\nfn main() {\n    println!(\"Hello\");\n}\n```";
     assert_eq!(result, expected);
 }
