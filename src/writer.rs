@@ -162,11 +162,33 @@ impl CommonMarkWriter {
 
         Ok(())
     }
-
     /// Write a paragraph node
     fn write_paragraph(&mut self, content: &[Node]) -> fmt::Result {
-        for node in content.iter() {
+        let mut prev_is_inline = false;
+
+        for (i, node) in content.iter().enumerate() {
+            // Check if the current node is an inline element
+            let is_inline = self.is_inline_element(node);
+
+            // If both current and previous nodes are inline elements, and it's not the first element,
+            // ensure there's no line break between them
+            if prev_is_inline
+                && is_inline
+                && i > 0
+                && !matches!(node, Node::SoftBreak | Node::HardBreak)
+            {
+                // Don't add extra whitespace to prevent incorrect line breaks
+            } else if i > 0 {
+                // Non-consecutive inline elements, add normal line break and indentation
+                self.write_char('\n')?;
+                // Add appropriate indentation (current indent level)
+                for _ in 0..(self.indent_level * self.options.indent_spaces) {
+                    self.write_char(' ')?;
+                }
+            }
+
             self.write(node)?;
+            prev_is_inline = is_inline;
         }
         Ok(())
     }
@@ -231,6 +253,10 @@ impl CommonMarkWriter {
 
     /// Write a list item
     fn write_list_item(&mut self, item: &ListItem, prefix: &str) -> fmt::Result {
+        // Apply indentation based on current level
+        for _ in 0..(self.indent_level * self.options.indent_spaces) {
+            self.write_char(' ')?;
+        }
         self.write_str(prefix)?;
 
         if item.is_task {
@@ -243,15 +269,39 @@ impl CommonMarkWriter {
 
         self.indent_level += 1;
 
+        // Track whether the previous element was an inline element
+        let mut prev_is_inline = false;
+
         for (i, node) in item.content.iter().enumerate() {
-            self.write(node)?;
-            if i < item.content.len() - 1 {
-                self.write_str("\n")?;
-                // Add indentation for child items
-                for _ in 0..self.options.indent_spaces {
+            // Determine if the current node is an inline element
+            let is_inline = self.is_inline_element(node);
+            let is_list = matches!(node, Node::OrderedList { .. } | Node::UnorderedList(..));
+
+            // Nested lists need special line break handling
+            if is_list {
+                if i > 0 {
+                    self.write_char('\n')?;
+                }
+                self.write(node)?;
+                prev_is_inline = false;
+                continue;
+            }
+
+            // If both previous and current are inline elements, prevent incorrect line breaks
+            if prev_is_inline && is_inline {
+                // Don't add extra separators to prevent incorrect line breaks for inline elements
+            } else if i > 0 {
+                // Non-consecutive inline elements, add normal line break and indentation
+                self.write_char('\n')?;
+                // Add appropriate indentation (list item prefix length + current indent level)
+                let prefix_length = prefix.len() + if item.is_task { 4 } else { 0 };
+                for _ in 0..(self.indent_level * self.options.indent_spaces) + prefix_length {
                     self.write_char(' ')?;
                 }
             }
+
+            self.write(node)?;
+            prev_is_inline = is_inline;
         }
 
         self.indent_level -= 1;
@@ -403,6 +453,19 @@ impl CommonMarkWriter {
         } else {
             self.write_str("\\\n")
         }
+    }
+
+    /// Check if a node is an inline element that shouldn't be broken across lines
+    fn is_inline_element(&self, node: &Node) -> bool {
+        matches!(
+            node,
+            Node::Text(_)
+                | Node::Emphasis(_)
+                | Node::Strong(_)
+                | Node::InlineCode(_)
+                | Node::Link { .. }
+                | Node::Image { .. }
+        )
     }
 
     /// Get the generated CommonMark format text
