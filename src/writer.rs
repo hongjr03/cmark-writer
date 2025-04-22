@@ -211,7 +211,22 @@ impl CommonMarkWriter {
 
     /// Write a code block node
     fn write_code_block(&mut self, language: &Option<String>, content: &str) -> fmt::Result {
-        self.write_str("```")?;
+        let mut max_backticks = 0;
+        let mut current = 0;
+        for c in content.chars() {
+            if c == '`' {
+                current += 1;
+                if current > max_backticks {
+                    max_backticks = current;
+                }
+            } else {
+                current = 0;
+            }
+        }
+        let fence_len = max(max_backticks + 1, 3);
+        let fence = "`".repeat(fence_len);
+
+        self.write_str(&fence)?;
         if let Some(lang) = language {
             self.write_str(lang)?;
         }
@@ -223,7 +238,7 @@ impl CommonMarkWriter {
             self.write_char('\n')?;
         }
 
-        self.write_str("```")?;
+        self.write_str(&fence)?;
         Ok(())
     }
 
