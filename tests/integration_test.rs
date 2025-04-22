@@ -1,5 +1,5 @@
-use cmark_rs::ast::{ListItem, Node};
-use cmark_rs::writer::CommonMarkWriter;
+use cmark_writer::ast::{ListItem, Node};
+use cmark_writer::writer::CommonMarkWriter;
 
 #[test]
 fn test_simple_document() {

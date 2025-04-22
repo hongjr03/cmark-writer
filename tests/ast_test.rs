@@ -1,4 +1,4 @@
-use cmark_rs::ast::{Alignment, ListItem, Node};
+use cmark_writer::ast::{Alignment, ListItem, Node};
 
 #[test]
 fn test_alignment() {
