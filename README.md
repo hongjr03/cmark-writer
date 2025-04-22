@@ -1,6 +1,6 @@
-# cmark-rs
+# cmark-writer
 
-[![CI Status](https://github.com/hongjr03/cmark-rs/workflows/CI/badge.svg)](https://github.com/hongjr03/cmark-rs/actions)
+[![CI Status](https://github.com/hongjr03/cmark-writer/workflows/CI/badge.svg)](https://github.com/hongjr03/cmark-writer/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A CommonMark writer implementation in Rust.
@@ -10,8 +10,8 @@ A CommonMark writer implementation in Rust.
 ### Basic Example
 
 ```rust
-use cmark_rs::ast::{Node, ListItem};
-use cmark_rs::writer::CommonMarkWriter;
+use cmark_writer::ast::{Node, ListItem};
+use cmark_writer::writer::CommonMarkWriter;
 
 fn main() {
     // Create a document
@@ -41,8 +41,8 @@ fn main() {
 You can customize the formatting behavior:
 
 ```rust
-use cmark_rs::writer::{CommonMarkWriter, WriterOptions};
-use cmark_rs::ast::Node;
+use cmark_writer::writer::{CommonMarkWriter, WriterOptions};
+use cmark_writer::ast::Node;
 
 // Create custom options
 let options = WriterOptions {

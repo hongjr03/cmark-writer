@@ -1,14 +1,14 @@
-//! # cmark-rs
+//! # cmark-writer
 //!
-//! `cmark-rs` is a Rust library for parsing and writing CommonMark format.
+//! `cmark-writer` is a Rust library for writing CommonMark format.
 //!
 //! This library provides functionality to serialize in-memory data structures to CommonMark compliant text.
 //!
 //! ## Example
 //!
 //! ```rust
-//! use cmark_rs::ast::{Node, ListItem};
-//! use cmark_rs::writer::CommonMarkWriter;
+//! use cmark_writer::ast::{Node, ListItem};
+//! use cmark_writer::writer::CommonMarkWriter;
 //!
 //! // Create a simple document
 //! let document = Node::Document(vec![
@@ -31,7 +31,7 @@
 //! println!("{}", markdown);
 //! ```
 
-// Re-export main public API components so users can access them directly via `cmark_rs::Node`
+// Re-export main public API components so users can access them directly via `cmark_writer::Node`
 pub use crate::ast::{Alignment, ListItem, Node};
 pub use crate::writer::{CommonMarkWriter, WriterOptions};
 

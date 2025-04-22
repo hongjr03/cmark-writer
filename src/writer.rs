@@ -44,8 +44,8 @@ impl CommonMarkWriter {
     /// # Example
     ///
     /// ```
-    /// use cmark_rs::writer::CommonMarkWriter;
-    /// use cmark_rs::ast::Node;
+    /// use cmark_writer::writer::CommonMarkWriter;
+    /// use cmark_writer::ast::Node;
     ///
     /// let mut writer = CommonMarkWriter::new();
     /// writer.write(&Node::Text("Hello".to_string())).unwrap();
@@ -64,7 +64,7 @@ impl CommonMarkWriter {
     /// # Example
     ///
     /// ```
-    /// use cmark_rs::writer::{CommonMarkWriter, WriterOptions};
+    /// use cmark_writer::writer::{CommonMarkWriter, WriterOptions};
     ///
     /// let options = WriterOptions {
     ///     strict: true,
@@ -94,8 +94,8 @@ impl CommonMarkWriter {
     /// # Example
     ///
     /// ```
-    /// use cmark_rs::writer::CommonMarkWriter;
-    /// use cmark_rs::ast::Node;
+    /// use cmark_writer::writer::CommonMarkWriter;
+    /// use cmark_writer::ast::Node;
     ///
     /// let mut writer = CommonMarkWriter::new();
     /// writer.write(&Node::Text("Hello".to_string())).unwrap();
@@ -475,8 +475,8 @@ impl CommonMarkWriter {
     /// # Example
     ///
     /// ```
-    /// use cmark_rs::writer::CommonMarkWriter;
-    /// use cmark_rs::ast::Node;
+    /// use cmark_writer::writer::CommonMarkWriter;
+    /// use cmark_writer::ast::Node;
     ///
     /// let mut writer = CommonMarkWriter::new();
     /// writer.write(&Node::Text("Hello".to_string())).unwrap();
