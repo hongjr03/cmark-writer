@@ -196,6 +196,7 @@ fn test_display_trait() {
     let node = Node::Strong(vec![Node::Text("important".to_string())]);
     assert_eq!(format!("{}", node), "**important**");
 }
+
 #[test]
 fn test_write_mixed_nested_lists() {
     let mut writer = CommonMarkWriter::new();
@@ -328,4 +329,65 @@ fn test_inline_elements_line_breaks() {
     let expected =
         "- Item with **bold** and *emphasis*\n- Item with `code` and a [link](https://example.com)";
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_write_text_with_newline_should_fail() {
+    let mut writer = CommonMarkWriter::new();
+    let text = Node::Text("Hello\nWorld".to_string());
+    assert!(writer.write(&text).is_err());
+}
+
+#[test]
+fn test_write_inline_code_with_newline_should_fail() {
+    let mut writer = CommonMarkWriter::new();
+    let code = Node::InlineCode("let x = 1;\nlet y = 2;".to_string());
+    assert!(writer.write(&code).is_err());
+}
+
+#[test]
+fn test_write_emphasis_with_newline_should_fail() {
+    let mut writer = CommonMarkWriter::new();
+    let emph = Node::Emphasis(vec![Node::Text("foo\nbar".to_string())]);
+    assert!(writer.write(&emph).is_err());
+}
+
+#[test]
+fn test_write_strong_with_newline_should_fail() {
+    let mut writer = CommonMarkWriter::new();
+    let strong = Node::Strong(vec![Node::Text("foo\nbar".to_string())]);
+    assert!(writer.write(&strong).is_err());
+}
+
+#[test]
+fn test_write_link_with_newline_should_fail() {
+    let mut writer = CommonMarkWriter::new();
+    let link = Node::Link {
+        url: "https://example.com".to_string(),
+        title: None,
+        content: vec![Node::Text("foo\nbar".to_string())],
+    };
+    assert!(writer.write(&link).is_err());
+}
+
+#[test]
+fn test_write_image_with_newline_should_fail() {
+    let mut writer = CommonMarkWriter::new();
+    let image = Node::Image {
+        url: "img.png".to_string(),
+        title: None,
+        alt: "foo\nbar".to_string(),
+    };
+    assert!(writer.write(&image).is_err());
+}
+
+#[test]
+fn test_write_table_cell_with_newline_should_fail() {
+    let mut writer = CommonMarkWriter::new();
+    let table = Node::Table {
+        headers: vec![Node::Text("header".to_string())],
+        rows: vec![vec![Node::Text("foo\nbar".to_string())]],
+        alignments: vec![Alignment::Left],
+    };
+    assert!(writer.write(&table).is_err());
 }

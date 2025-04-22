@@ -4,7 +4,10 @@
 //! The main component is the CommonMarkWriter class, which serializes AST nodes to CommonMark-compliant text.
 
 use crate::ast::{Alignment, ListItem, Node};
-use std::fmt::{self};
+use std::{
+    cmp::max,
+    fmt::{self},
+};
 
 /// CommonMark formatting options
 #[derive(Debug, Clone)]
@@ -328,6 +331,27 @@ impl CommonMarkWriter {
         self.write_str("---")
     }
 
+    /// Check if the node contains a newline character and return an error if it does
+    fn check_no_newline(&self, node: &Node) -> fmt::Result {
+        if Self::node_contains_newline(node) {
+            return Err(fmt::Error);
+        }
+        Ok(())
+    }
+
+    /// Check if the node contains a newline character recursively
+    fn node_contains_newline(node: &Node) -> bool {
+        match node {
+            Node::Text(s) | Node::InlineCode(s) | Node::Html(s) => s.contains('\n'),
+            Node::Emphasis(children) | Node::Strong(children) => {
+                children.iter().any(Self::node_contains_newline)
+            }
+            Node::Link { content, .. } => content.iter().any(Self::node_contains_newline),
+            Node::Image { alt, .. } => alt.contains('\n'),
+            _ => false,
+        }
+    }
+
     /// Write a table
     fn write_table(
         &mut self,
@@ -338,6 +362,7 @@ impl CommonMarkWriter {
         // Write header
         self.write_char('|')?;
         for header in headers {
+            self.check_no_newline(header)?;
             self.write_char(' ')?;
             self.write(header)?;
             self.write_str(" |")?;
@@ -360,6 +385,7 @@ impl CommonMarkWriter {
         for row in rows {
             self.write_char('|')?;
             for cell in row {
+                self.check_no_newline(cell)?;
                 self.write_char(' ')?;
                 self.write(cell)?;
                 self.write_str(" |")?;
@@ -372,6 +398,9 @@ impl CommonMarkWriter {
 
     /// Write a link
     fn write_link(&mut self, url: &str, title: &Option<String>, content: &[Node]) -> fmt::Result {
+        for node in content {
+            self.check_no_newline(node)?;
+        }
         self.write_char('[')?;
 
         for node in content {
@@ -392,6 +421,7 @@ impl CommonMarkWriter {
 
     /// Write an image
     fn write_image(&mut self, url: &str, title: &Option<String>, alt: &str) -> fmt::Result {
+        self.check_no_newline(&Node::Text(alt.to_string()))?;
         self.write_str("![")?;
         self.write_str(alt)?;
         self.write_str("](")?;
@@ -408,6 +438,9 @@ impl CommonMarkWriter {
 
     /// Write emphasis (italic)
     fn write_emphasis(&mut self, content: &[Node]) -> fmt::Result {
+        for node in content {
+            self.check_no_newline(node)?;
+        }
         self.write_char('*')?;
 
         for node in content {
@@ -419,6 +452,9 @@ impl CommonMarkWriter {
 
     /// Write strong emphasis (bold)
     fn write_strong(&mut self, content: &[Node]) -> fmt::Result {
+        for node in content {
+            self.check_no_newline(node)?;
+        }
         self.write_str("**")?;
 
         for node in content {
@@ -430,6 +466,7 @@ impl CommonMarkWriter {
 
     /// Write inline code
     fn write_inline_code(&mut self, content: &str) -> fmt::Result {
+        self.check_no_newline(&Node::InlineCode(content.to_string()))?;
         self.write_char('`')?;
         self.write_str(content)?;
         self.write_char('`')
@@ -437,6 +474,7 @@ impl CommonMarkWriter {
 
     /// Write plain text
     fn write_text(&mut self, content: &str) -> fmt::Result {
+        self.check_no_newline(&Node::Text(content.to_string()))?;
         // Escape special characters
         let escaped = content
             .replace('\\', "\\\\")
