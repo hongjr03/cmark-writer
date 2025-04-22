@@ -1,5 +1,5 @@
-use cmark_rs::ast::{Alignment, ListItem, Node};
-use cmark_rs::writer::{CommonMarkWriter, WriterOptions};
+use cmark_writer::ast::{Alignment, ListItem, Node};
+use cmark_writer::writer::{CommonMarkWriter, WriterOptions};
 
 #[test]
 fn test_write_text() {
@@ -252,7 +252,8 @@ fn test_write_mixed_nested_lists() {
     writer.write(&mixed_list).unwrap();
     let result = writer.into_string();
 
-    // Using explicit escape characters for newlines and spaces to ensure correct preservation of indentation
+    // Using explicit escape characters for newlines and spaces to ensure correct
+    // preservation of indentation
     let expected = r#"- Level 1 item 1
 - Level 1 item 2
     1. Level 2 ordered item 1

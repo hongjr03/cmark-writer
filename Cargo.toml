@@ -1,8 +1,4 @@
 [package]
-name = "cmark-rs"
+name = "cmark-writer"
 version = "0.1.0"
 edition = "2021"
-
-[lib]
-name = "cmark_rs"
-path = "src/lib.rs"
