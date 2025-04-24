@@ -3,25 +3,34 @@
 //! This module defines various node types for representing CommonMark documents,
 //! including headings, paragraphs, lists, code blocks, etc.
 
-/// Represents a node type in a CommonMark document
+/// Main node type, representing an element in a CommonMark document
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
-    /// Root document node, containing child nodes
-    Document(Vec<Node>),
+    /// Block-level node
+    Block(BlockNode),
+    /// Inline node
+    Inline(InlineNode),
+}
 
-    /// Heading, containing level (1-6) and content
+/// Block-level node type, representing content blocks that can exist independently
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlockNode {
+    /// Root document node, contains child block nodes
+    Document(Vec<BlockNode>),
+
+    /// Heading, contains level (1-6) and inline content
     Heading {
         /// Heading level, 1-6
         level: u8,
         /// Heading content, containing inline elements
-        content: Vec<Node>,
+        content: Vec<InlineNode>,
     },
 
     /// Paragraph node, containing inline elements
-    Paragraph(Vec<Node>),
+    Paragraph(Vec<InlineNode>),
 
     /// Block quote, containing any block-level elements
-    BlockQuote(Vec<Node>),
+    BlockQuote(Vec<BlockNode>),
 
     /// Code block, containing optional language identifier and content
     CodeBlock {
@@ -48,12 +57,34 @@ pub enum Node {
     /// Table
     Table {
         /// Header cells
-        headers: Vec<Node>,
-        /// Table rows, each containing multiple cells
-        rows: Vec<Vec<Node>>,
+        headers: Vec<InlineNode>,
+        /// Table rows, each row containing multiple cells
+        rows: Vec<Vec<InlineNode>>,
         /// Column alignments
         alignments: Vec<Alignment>,
     },
+
+    /// HTML block
+    HtmlBlock(String),
+}
+
+/// Inline node type, representing inline elements used within block-level elements
+#[derive(Debug, Clone, PartialEq)]
+pub enum InlineNode {
+    /// Plain text
+    Text(String),
+
+    /// Emphasis (italic)
+    Emphasis(Vec<InlineNode>),
+
+    /// Strong emphasis (bold)
+    Strong(Vec<InlineNode>),
+
+    /// Strikethrough
+    Strike(Vec<InlineNode>),
+
+    /// Inline code
+    InlineCode(String),
 
     /// Link
     Link {
@@ -61,8 +92,8 @@ pub enum Node {
         url: String,
         /// Optional link title
         title: Option<String>,
-        /// Link text content
-        content: Vec<Node>,
+        /// Link text
+        content: Vec<InlineNode>,
     },
 
     /// Image
@@ -71,56 +102,44 @@ pub enum Node {
         url: String,
         /// Optional image title
         title: Option<String>,
-        /// Image alt text
+        /// Alternative text
         alt: String,
     },
 
-    /// Emphasis (italic)
-    Emphasis(Vec<Node>),
+    /// Inline element collection, without formatting and line breaks
+    InlineContainer(Vec<InlineNode>),
 
-    /// Strong emphasis (bold)
-    Strong(Vec<Node>),
-
-    /// Strikethrough text
-    Strike(Vec<Node>),
-
-    /// Inline code
-    InlineCode(String),
-
-    /// Plain text
-    Text(String),
-
-    /// Inline container, content is written inline without any formatting or line breaks
-    Inline(Vec<Node>),
-
-    /// HTML block
-    Html(String),
-
-    /// Custom HTML element with attributes and children
+    /// HTML inline element
     HtmlElement(HtmlElement),
 
-    /// Soft line break (single newline)
+    /// Soft break (single line break)
     SoftBreak,
 
-    /// Hard line break (two spaces followed by newline or backslash followed by newline)
+    /// Hard break (two spaces followed by a line break, or backslash followed by a line break)
     HardBreak,
 }
 
-/// Represents a list item
+/// List item type
 #[derive(Debug, Clone, PartialEq)]
-pub struct ListItem {
-    /// List item content, containing one or more block-level elements
-    pub content: Vec<Node>,
-    /// Whether this is a task list item
-    pub is_task: bool,
-    /// Whether the task is completed
-    pub task_completed: bool,
+pub enum ListItem {
+    /// Regular list item
+    Regular {
+        /// List item content, containing one or more block-level elements
+        content: Vec<BlockNode>,
+    },
+    /// Task list item
+    Task {
+        /// Whether the task is completed
+        completed: bool,
+        /// Task content
+        content: Vec<BlockNode>,
+    },
 }
 
 /// Table column alignment
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Alignment {
-    /// No specified alignment
+    /// No specific alignment
     None,
     /// Left alignment
     Left,
@@ -130,7 +149,7 @@ pub enum Alignment {
     Right,
 }
 
-/// Represents an HTML attribute with name and value
+/// Represents an HTML attribute, containing name and value
 #[derive(Debug, Clone, PartialEq)]
 pub struct HtmlAttribute {
     /// Attribute name
@@ -139,15 +158,30 @@ pub struct HtmlAttribute {
     pub value: String,
 }
 
-/// Represents an HTML element with tag name, attributes and child nodes
+/// Represents an HTML element, containing tag name, attributes, and child nodes
 #[derive(Debug, Clone, PartialEq)]
 pub struct HtmlElement {
     /// Element tag name
     pub tag: String,
     /// Element attributes
     pub attributes: Vec<HtmlAttribute>,
-    /// Element children
-    pub children: Vec<Node>,
-    /// Whether this is a self-closing tag (e.g., <img />)
+    /// Element child nodes (can only contain inline nodes)
+    pub children: Vec<InlineNode>,
+    /// Whether it's a self-closing tag (e.g. <img />)
     pub self_closing: bool,
+}
+
+// Provides backward compatibility conversion functions and trait implementations
+impl BlockNode {
+    /// Converts a BlockNode to Node
+    pub fn into_node(self) -> Node {
+        Node::Block(self)
+    }
+}
+
+impl InlineNode {
+    /// Converts an InlineNode to Node
+    pub fn into_node(self) -> Node {
+        Node::Inline(self)
+    }
 }
