@@ -550,12 +550,12 @@ impl CommonMarkWriter {
     }
 
     /// Write into inline container
-    fn write_inline(&mut self, content: &[Node]) -> fmt::Result {
-        for node in content {
-            self.check_no_newline(node)?;
-        }
-        for node in content.iter() {
-            self.write(node)?;
+    fn write_inline(&mut self, children: &[Node]) -> fmt::Result {
+        for (i, child) in children.iter().enumerate() {
+            self.write(child)?;
+            if i < children.len() - 1 {
+                self.write_str(" ")?;
+            }
         }
         Ok(())
     }
