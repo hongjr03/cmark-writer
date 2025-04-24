@@ -391,3 +391,220 @@ fn test_write_table_cell_with_newline_should_fail() {
     };
     assert!(writer.write(&table).is_err());
 }
+
+#[test]
+fn test_write_strike() {
+    let mut writer = CommonMarkWriter::new();
+    let strike = Node::Strike(vec![Node::Text("strikethrough".to_string())]);
+    writer.write(&strike).unwrap();
+    assert_eq!(writer.into_string(), "~~strikethrough~~");
+}
+
+#[test]
+fn test_write_strike_with_newline_should_fail() {
+    let mut writer = CommonMarkWriter::new();
+    let strike = Node::Strike(vec![Node::Text("foo\nbar".to_string())]);
+    assert!(writer.write(&strike).is_err());
+}
+
+#[test]
+fn test_write_mixed_formatting() {
+    let mut writer = CommonMarkWriter::new();
+    let paragraph = Node::Paragraph(vec![
+        Node::Text("This is ".to_string()),
+        Node::Strong(vec![Node::Text("bold".to_string())]),
+        Node::Text(" and ".to_string()),
+        Node::Emphasis(vec![Node::Text("emphasized".to_string())]),
+        Node::Text(" and ".to_string()),
+        Node::Strike(vec![Node::Text("strikethrough".to_string())]),
+        Node::Text(" text.".to_string()),
+    ]);
+
+    writer.write(&paragraph).unwrap();
+    let result = writer.into_string();
+
+    let expected = "This is **bold** and *emphasized* and ~~strikethrough~~ text.";
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_write_nested_formatting_with_strike() {
+    let mut writer = CommonMarkWriter::new();
+    let paragraph = Node::Paragraph(vec![
+        Node::Text("This contains ".to_string()),
+        Node::Strike(vec![
+            Node::Text("strikethrough with ".to_string()),
+            Node::Strong(vec![Node::Text("bold".to_string())]),
+            Node::Text(" inside".to_string()),
+        ]),
+        Node::Text(".".to_string()),
+    ]);
+
+    writer.write(&paragraph).unwrap();
+    let result = writer.into_string();
+
+    let expected = "This contains ~~strikethrough with **bold** inside~~.";
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_write_html_element() {
+    use cmark_writer::ast::{HtmlAttribute, HtmlElement};
+
+    let mut writer = CommonMarkWriter::new();
+    let html_element = Node::HtmlElement(HtmlElement {
+        tag: "div".to_string(),
+        attributes: vec![
+            HtmlAttribute {
+                name: "class".to_string(),
+                value: "container".to_string(),
+            },
+            HtmlAttribute {
+                name: "id".to_string(),
+                value: "main".to_string(),
+            },
+        ],
+        children: vec![Node::Text("内容".to_string())],
+        self_closing: false,
+    });
+
+    writer.write(&html_element).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "<div class=\"container\" id=\"main\">内容</div>"
+    );
+}
+
+#[test]
+fn test_write_self_closing_html_element() {
+    use cmark_writer::ast::{HtmlAttribute, HtmlElement};
+
+    let mut writer = CommonMarkWriter::new();
+    let img = Node::HtmlElement(HtmlElement {
+        tag: "img".to_string(),
+        attributes: vec![
+            HtmlAttribute {
+                name: "src".to_string(),
+                value: "image.jpg".to_string(),
+            },
+            HtmlAttribute {
+                name: "alt".to_string(),
+                value: "图片描述".to_string(),
+            },
+        ],
+        children: vec![],
+        self_closing: true,
+    });
+
+    writer.write(&img).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "<img src=\"image.jpg\" alt=\"图片描述\" />"
+    );
+}
+
+#[test]
+fn test_nested_html_elements() {
+    use cmark_writer::ast::{HtmlAttribute, HtmlElement};
+
+    let mut writer = CommonMarkWriter::new();
+    let nested_element = Node::HtmlElement(HtmlElement {
+        tag: "div".to_string(),
+        attributes: vec![HtmlAttribute {
+            name: "class".to_string(),
+            value: "outer".to_string(),
+        }],
+        children: vec![
+            Node::Text("开始 ".to_string()),
+            Node::HtmlElement(HtmlElement {
+                tag: "span".to_string(),
+                attributes: vec![HtmlAttribute {
+                    name: "class".to_string(),
+                    value: "inner".to_string(),
+                }],
+                children: vec![Node::Text("嵌套内容".to_string())],
+                self_closing: false,
+            }),
+            Node::Text(" 结束".to_string()),
+        ],
+        self_closing: false,
+    });
+
+    writer.write(&nested_element).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "<div class=\"outer\">开始 <span class=\"inner\">嵌套内容</span> 结束</div>"
+    );
+}
+
+#[test]
+fn test_html_element_with_formatted_content() {
+    use cmark_writer::ast::{HtmlAttribute, HtmlElement};
+
+    let mut writer = CommonMarkWriter::new();
+    let element = Node::HtmlElement(HtmlElement {
+        tag: "p".to_string(),
+        attributes: vec![HtmlAttribute {
+            name: "class".to_string(),
+            value: "text".to_string(),
+        }],
+        children: vec![
+            Node::Text("普通文本 ".to_string()),
+            Node::Strong(vec![Node::Text("粗体文本".to_string())]),
+            Node::Text(" 和 ".to_string()),
+            Node::Emphasis(vec![Node::Text("斜体文本".to_string())]),
+        ],
+        self_closing: false,
+    });
+
+    writer.write(&element).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "<p class=\"text\">普通文本 **粗体文本** 和 *斜体文本*</p>"
+    );
+}
+
+#[test]
+fn test_html_attribute_with_quotes() {
+    use cmark_writer::ast::{HtmlAttribute, HtmlElement};
+
+    let mut writer = CommonMarkWriter::new();
+    let element = Node::HtmlElement(HtmlElement {
+        tag: "div".to_string(),
+        attributes: vec![HtmlAttribute {
+            name: "data-text".to_string(),
+            value: "含有\"引号\"的属性值".to_string(),
+        }],
+        children: vec![Node::Text("内容".to_string())],
+        self_closing: false,
+    });
+
+    writer.write(&element).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "<div data-text=\"含有&quot;引号&quot;的属性值\">内容</div>"
+    );
+}
+
+#[test]
+fn test_html_element_in_paragraph() {
+    use cmark_writer::ast::HtmlElement;
+
+    let mut writer = CommonMarkWriter::new();
+    let paragraph = Node::Paragraph(vec![
+        Node::Text("文本开始 ".to_string()),
+        Node::HtmlElement(HtmlElement {
+            tag: "code".to_string(),
+            attributes: vec![],
+            children: vec![Node::Text("代码片段".to_string())],
+            self_closing: false,
+        }),
+        Node::Text(" 文本结束".to_string()),
+    ]);
+
+    writer.write(&paragraph).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "文本开始 <code>代码片段</code> 文本结束"
+    );
+}

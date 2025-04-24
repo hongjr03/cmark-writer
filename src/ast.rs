@@ -81,6 +81,9 @@ pub enum Node {
     /// Strong emphasis (bold)
     Strong(Vec<Node>),
 
+    /// Strikethrough text
+    Strike(Vec<Node>),
+
     /// Inline code
     InlineCode(String),
 
@@ -89,6 +92,9 @@ pub enum Node {
 
     /// HTML block
     Html(String),
+
+    /// Custom HTML element with attributes and children
+    HtmlElement(HtmlElement),
 
     /// Soft line break (single newline)
     SoftBreak,
@@ -119,4 +125,26 @@ pub enum Alignment {
     Center,
     /// Right alignment
     Right,
+}
+
+/// Represents an HTML attribute with name and value
+#[derive(Debug, Clone, PartialEq)]
+pub struct HtmlAttribute {
+    /// Attribute name
+    pub name: String,
+    /// Attribute value
+    pub value: String,
+}
+
+/// Represents an HTML element with tag name, attributes and child nodes
+#[derive(Debug, Clone, PartialEq)]
+pub struct HtmlElement {
+    /// Element tag name
+    pub tag: String,
+    /// Element attributes
+    pub attributes: Vec<HtmlAttribute>,
+    /// Element children
+    pub children: Vec<Node>,
+    /// Whether this is a self-closing tag (e.g., <img />)
+    pub self_closing: bool,
 }

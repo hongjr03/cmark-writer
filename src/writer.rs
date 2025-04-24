@@ -126,9 +126,11 @@ impl CommonMarkWriter {
             Node::Image { url, title, alt } => self.write_image(url, title, alt),
             Node::Emphasis(content) => self.write_emphasis(content),
             Node::Strong(content) => self.write_strong(content),
+            Node::Strike(content) => self.write_strike(content),
             Node::InlineCode(content) => self.write_inline_code(content),
             Node::Text(content) => self.write_text(content),
             Node::Html(content) => self.write_html(content),
+            Node::HtmlElement(element) => self.write_html_element(element),
             Node::SoftBreak => self.write_soft_break(),
             Node::HardBreak => self.write_hard_break(),
         }
@@ -343,9 +345,10 @@ impl CommonMarkWriter {
     fn node_contains_newline(node: &Node) -> bool {
         match node {
             Node::Text(s) | Node::InlineCode(s) | Node::Html(s) => s.contains('\n'),
-            Node::Emphasis(children) | Node::Strong(children) => {
+            Node::Emphasis(children) | Node::Strong(children) | Node::Strike(children) => {
                 children.iter().any(Self::node_contains_newline)
             }
+            Node::HtmlElement(element) => element.children.iter().any(Self::node_contains_newline),
             Node::Link { content, .. } => content.iter().any(Self::node_contains_newline),
             Node::Image { alt, .. } => alt.contains('\n'),
             _ => false,
@@ -464,6 +467,20 @@ impl CommonMarkWriter {
         self.write_str("**")
     }
 
+    /// Write a strikethrough text
+    fn write_strike(&mut self, content: &[Node]) -> fmt::Result {
+        for node in content {
+            self.check_no_newline(node)?;
+        }
+        self.write_str("~~")?;
+
+        for node in content {
+            self.write(node)?;
+        }
+
+        self.write_str("~~")
+    }
+
     /// Write inline code
     fn write_inline_code(&mut self, content: &str) -> fmt::Result {
         self.check_no_newline(&Node::InlineCode(content.to_string()))?;
@@ -487,6 +504,43 @@ impl CommonMarkWriter {
             .replace('`', "\\`");
 
         self.write_str(&escaped)
+    }
+
+    /// Write an HTML element with attributes and children
+    fn write_html_element(&mut self, element: &crate::ast::HtmlElement) -> fmt::Result {
+        self.write_char('<')?;
+        self.write_str(&element.tag)?;
+
+        // Write attributes
+        for attr in &element.attributes {
+            self.write_char(' ')?;
+            self.write_str(&attr.name)?;
+            self.write_str("=\"")?;
+            // Escape quotes in attribute values
+            let escaped_value = attr.value.replace('"', "&quot;");
+            self.write_str(&escaped_value)?;
+            self.write_char('"')?;
+        }
+
+        if element.self_closing {
+            // Self-closing tag like <img />
+            self.write_str(" />")?;
+            return Ok(());
+        }
+
+        self.write_char('>')?;
+
+        // Process children
+        for child in &element.children {
+            self.write(child)?;
+        }
+
+        // Close tag
+        self.write_str("</")?;
+        self.write_str(&element.tag)?;
+        self.write_char('>')?;
+
+        Ok(())
     }
 
     /// Write HTML
@@ -515,9 +569,11 @@ impl CommonMarkWriter {
             Node::Text(_)
                 | Node::Emphasis(_)
                 | Node::Strong(_)
+                | Node::Strike(_)
                 | Node::InlineCode(_)
                 | Node::Link { .. }
                 | Node::Image { .. }
+                | Node::HtmlElement(_)
         )
     }
 
