@@ -129,6 +129,7 @@ impl CommonMarkWriter {
             Node::Strike(content) => self.write_strike(content),
             Node::InlineCode(content) => self.write_inline_code(content),
             Node::Text(content) => self.write_text(content),
+            Node::Inline(content) => self.write_inline(content),
             Node::Html(content) => self.write_html(content),
             Node::HtmlElement(element) => self.write_html_element(element),
             Node::SoftBreak => self.write_soft_break(),
@@ -546,6 +547,17 @@ impl CommonMarkWriter {
     /// Write HTML
     fn write_html(&mut self, content: &str) -> fmt::Result {
         self.write_str(content)
+    }
+
+    /// Write into inline container
+    fn write_inline(&mut self, content: &[Node]) -> fmt::Result {
+        for node in content {
+            self.check_no_newline(node)?;
+        }
+        for node in content.iter() {
+            self.write(node)?;
+        }
+        Ok(())
     }
 
     /// Write a soft line break

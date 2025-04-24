@@ -90,6 +90,9 @@ pub enum Node {
     /// Plain text
     Text(String),
 
+    /// Inline container, content is written inline without any formatting or line breaks
+    Inline(Vec<Node>),
+
     /// HTML block
     Html(String),
 
