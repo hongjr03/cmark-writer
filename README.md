@@ -41,7 +41,8 @@ fn main() {
 You can customize the formatting behavior:
 
 ```rust
-use cmark_writer::writer::{CommonMarkWriter, WriterOptions};
+use cmark_writer::options::WriterOptions;
+use cmark_writer::writer::CommonMarkWriter;
 use cmark_writer::ast::Node;
 
 // Create custom options
