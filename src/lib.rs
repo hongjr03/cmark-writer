@@ -32,9 +32,15 @@
 //! ```
 
 // Re-export main public API components so users can access them directly via `cmark_writer::Node`
-pub use crate::ast::{Alignment, BlockNode, HtmlAttribute, HtmlElement, InlineNode, ListItem, Node};
-pub use crate::writer::{CommonMarkWriter, WriterOptions};
+pub use crate::ast::{
+    Alignment, BlockNode, HtmlAttribute, HtmlElement, InlineNode, ListItem, Node,
+};
+pub use crate::error::{WriteError, WriteResult};
+pub use crate::options::WriterOptions;
+pub use crate::writer::CommonMarkWriter;
 
 // Export public modules to allow users to access more advanced functionality
 pub mod ast;
+pub mod error;
+pub mod options;
 pub mod writer;

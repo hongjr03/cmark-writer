@@ -1,5 +1,6 @@
 use cmark_writer::ast::{Alignment, BlockNode, InlineNode, ListItem, Node};
-use cmark_writer::writer::{CommonMarkWriter, WriterOptions};
+use cmark_writer::options::WriterOptions;
+use cmark_writer::writer::CommonMarkWriter;
 
 #[test]
 fn test_write_text() {
@@ -599,7 +600,7 @@ fn test_html_attribute_with_quotes() {
     writer.write(&element).unwrap();
     assert_eq!(
         writer.into_string(),
-        "<div data-text=\"含有&quot;引号&quot;的属性值\">内容</div>"
+        "<div data-text=\"含有\"引号\"的属性值\">内容</div>"
     );
 }
 
@@ -658,13 +659,13 @@ fn test_hard_break_with_chinese_text() {
     // 测试使用空格换行的选项
     let options = WriterOptions {
         strict: true,
-        hard_break_spaces: true,  // 使用两个空格加换行
+        hard_break_spaces: true, // 使用两个空格加换行
         indent_spaces: 4,
     };
     let mut writer = CommonMarkWriter::with_options(options);
     writer.write(&paragraph).unwrap();
     let result = writer.into_string();
-    
+
     let expected_spaces = "换行测试：  \n这行文字应该在上一行的下方紧跟着。";
     assert_eq!(result, expected_spaces);
 }
