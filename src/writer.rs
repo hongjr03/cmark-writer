@@ -187,26 +187,8 @@ impl CommonMarkWriter {
 
     /// Write a paragraph node
     fn write_paragraph(&mut self, content: &[InlineNode]) -> fmt::Result {
-        let mut prev_is_inline = false;
-
-        for (i, node) in content.iter().enumerate() {
-            // Check if the current node is an inline element that should be kept inline
-            let is_inline = !matches!(node, InlineNode::SoftBreak | InlineNode::HardBreak);
-
-            // If both current and previous elements should be kept inline, and it's not the first element
-            if prev_is_inline && is_inline && i > 0 {
-                // Don't add extra whitespace to prevent incorrect line breaks
-            } else if i > 0 {
-                // Non-consecutive inline elements, add normal line break and indentation
-                self.write_char('\n')?;
-                // Add appropriate indentation (current indent level)
-                for _ in 0..(self.indent_level * self.options.indent_spaces) {
-                    self.write_char(' ')?;
-                }
-            }
-
+        for node in content.iter() {
             self.write_inline(node)?;
-            prev_is_inline = is_inline;
         }
         Ok(())
     }

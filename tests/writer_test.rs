@@ -638,3 +638,33 @@ fn test_write_html_block() {
         "<div class=\"container\">\n  <h1>标题</h1>\n  <p>段落</p>\n</div>"
     );
 }
+
+#[test]
+fn test_hard_break_with_chinese_text() {
+    let mut writer = CommonMarkWriter::new();
+    let paragraph = Node::Block(BlockNode::Paragraph(vec![
+        InlineNode::Text("换行测试：".to_string()),
+        InlineNode::HardBreak,
+        InlineNode::Text("这行文字应该在上一行的下方紧跟着。".to_string()),
+    ]));
+
+    writer.write(&paragraph).unwrap();
+    let result = writer.into_string();
+
+    // 默认使用反斜杠换行
+    let expected = "换行测试：\\\n这行文字应该在上一行的下方紧跟着。";
+    assert_eq!(result, expected);
+
+    // 测试使用空格换行的选项
+    let options = WriterOptions {
+        strict: true,
+        hard_break_spaces: true,  // 使用两个空格加换行
+        indent_spaces: 4,
+    };
+    let mut writer = CommonMarkWriter::with_options(options);
+    writer.write(&paragraph).unwrap();
+    let result = writer.into_string();
+    
+    let expected_spaces = "换行测试：  \n这行文字应该在上一行的下方紧跟着。";
+    assert_eq!(result, expected_spaces);
+}
