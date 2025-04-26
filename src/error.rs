@@ -13,10 +13,10 @@ pub enum WriteError {
     InvalidHeadingLevel(u8),
     /// A newline character was found in an inline element where it's not allowed (e.g., in strict mode or specific contexts like table cells, link text, image alt text).
     NewlineInInlineElement(String),
-    /// A newline character was found in image alt text.
-    NewlineInImageAltText,
     /// An underlying formatting error occurred.
     FmtError(String),
+    /// An unsupported node type was encountered.
+    UnsupportedNodeType,
 }
 
 impl Display for WriteError {
@@ -32,10 +32,10 @@ impl Display for WriteError {
                 "Newline character found within an inline element ({}) which is not allowed in strict mode or this context.",
                 context
             ),
-            WriteError::NewlineInImageAltText => {
-                write!(f, "Newline character found in image alt text, which is not allowed.")
-            }
             WriteError::FmtError(msg) => write!(f, "Formatting error: {}", msg),
+            WriteError::UnsupportedNodeType => {
+                write!(f, "Unsupported node type encountered during writing.")
+            }
         }
     }
 }

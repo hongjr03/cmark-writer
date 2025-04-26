@@ -6,31 +6,23 @@
 /// Main node type, representing an element in a CommonMark document
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
-    /// Block-level node
-    Block(BlockNode),
-    /// Inline node
-    Inline(InlineNode),
-}
-
-/// Block-level node type, representing content blocks that can exist independently
-#[derive(Debug, Clone, PartialEq)]
-pub enum BlockNode {
-    /// Root document node, contains child block nodes
-    Document(Vec<BlockNode>),
+    // Block-level nodes
+    /// Root document node, contains child nodes
+    Document(Vec<Node>),
 
     /// Heading, contains level (1-6) and inline content
     Heading {
         /// Heading level, 1-6
         level: u8,
         /// Heading content, containing inline elements
-        content: Vec<InlineNode>,
+        content: Vec<Node>,
     },
 
     /// Paragraph node, containing inline elements
-    Paragraph(Vec<InlineNode>),
+    Paragraph(Vec<Node>),
 
     /// Block quote, containing any block-level elements
-    BlockQuote(Vec<BlockNode>),
+    BlockQuote(Vec<Node>),
 
     /// Code block, containing optional language identifier and content
     CodeBlock {
@@ -57,31 +49,28 @@ pub enum BlockNode {
     /// Table
     Table {
         /// Header cells
-        headers: Vec<InlineNode>,
+        headers: Vec<Node>,
         /// Table rows, each row containing multiple cells
-        rows: Vec<Vec<InlineNode>>,
+        rows: Vec<Vec<Node>>,
         /// Column alignments
         alignments: Vec<Alignment>,
     },
 
     /// HTML block
     HtmlBlock(String),
-}
 
-/// Inline node type, representing inline elements used within block-level elements
-#[derive(Debug, Clone, PartialEq)]
-pub enum InlineNode {
+    // Inline nodes
     /// Plain text
     Text(String),
 
     /// Emphasis (italic)
-    Emphasis(Vec<InlineNode>),
+    Emphasis(Vec<Node>),
 
     /// Strong emphasis (bold)
-    Strong(Vec<InlineNode>),
+    Strong(Vec<Node>),
 
     /// Strikethrough
-    Strike(Vec<InlineNode>),
+    Strike(Vec<Node>),
 
     /// Inline code
     InlineCode(String),
@@ -93,7 +82,7 @@ pub enum InlineNode {
         /// Optional link title
         title: Option<String>,
         /// Link text
-        content: Vec<InlineNode>,
+        content: Vec<Node>,
     },
 
     /// Image
@@ -102,12 +91,12 @@ pub enum InlineNode {
         url: String,
         /// Optional image title
         title: Option<String>,
-        /// Alternative text
-        alt: String,
+        /// Alternative text, containing inline elements
+        alt: Vec<Node>,
     },
 
     /// Inline element collection, without formatting and line breaks
-    InlineContainer(Vec<InlineNode>),
+    InlineContainer(Vec<Node>),
 
     /// HTML inline element
     HtmlElement(HtmlElement),
@@ -122,17 +111,17 @@ pub enum InlineNode {
 /// List item type
 #[derive(Debug, Clone, PartialEq)]
 pub enum ListItem {
-    /// Regular list item
-    Regular {
+    /// Unordered list item
+    Unordered {
         /// List item content, containing one or more block-level elements
-        content: Vec<BlockNode>,
+        content: Vec<Node>,
     },
-    /// Task list item
-    Task {
-        /// Whether the task is completed
-        completed: bool,
-        /// Task content
-        content: Vec<BlockNode>,
+    /// Ordered list item
+    Ordered {
+        /// Optional item number for ordered lists, allowing manual numbering
+        number: Option<u32>,
+        /// List item content, containing one or more block-level elements
+        content: Vec<Node>,
     },
 }
 
@@ -166,22 +155,44 @@ pub struct HtmlElement {
     /// Element attributes
     pub attributes: Vec<HtmlAttribute>,
     /// Element child nodes (can only contain inline nodes)
-    pub children: Vec<InlineNode>,
+    pub children: Vec<Node>,
     /// Whether it's a self-closing tag (e.g. <img />)
     pub self_closing: bool,
 }
 
-// Provides backward compatibility conversion functions and trait implementations
-impl BlockNode {
-    /// Converts a BlockNode to Node
-    pub fn into_node(self) -> Node {
-        Node::Block(self)
+impl Node {
+    /// Check if a node is a block-level node
+    pub fn is_block(&self) -> bool {
+        matches!(
+            self,
+            Node::Document(_)
+                | Node::Heading { .. }
+                | Node::Paragraph(_)
+                | Node::BlockQuote(_)
+                | Node::CodeBlock { .. }
+                | Node::UnorderedList(_)
+                | Node::OrderedList { .. }
+                | Node::ThematicBreak
+                | Node::Table { .. }
+                | Node::HtmlBlock(_)
+        )
     }
-}
 
-impl InlineNode {
-    /// Converts an InlineNode to Node
-    pub fn into_node(self) -> Node {
-        Node::Inline(self)
+    /// Check if a node is an inline node
+    pub fn is_inline(&self) -> bool {
+        matches!(
+            self,
+            Node::Text(_)
+                | Node::Emphasis(_)
+                | Node::Strong(_)
+                | Node::Strike(_)
+                | Node::InlineCode(_)
+                | Node::Link { .. }
+                | Node::Image { .. }
+                | Node::InlineContainer(_)
+                | Node::HtmlElement(_)
+                | Node::SoftBreak
+                | Node::HardBreak
+        )
     }
 }

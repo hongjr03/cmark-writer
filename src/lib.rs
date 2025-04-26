@@ -7,21 +7,21 @@
 //! ## Example
 //!
 //! ```rust
-//! use cmark_writer::ast::{Node, BlockNode, InlineNode, ListItem};
+//! use cmark_writer::ast::{Node, ListItem};
 //! use cmark_writer::writer::CommonMarkWriter;
 //!
 //! // Create a simple document
-//! let document = BlockNode::Document(vec![
-//!     BlockNode::Heading {
+//! let document = Node::Document(vec![
+//!     Node::Heading {
 //!         level: 1,
-//!         content: vec![InlineNode::Text("Hello CommonMark".to_string())],
+//!         content: vec![Node::Text("Hello CommonMark".to_string())],
 //!     },
-//!     BlockNode::Paragraph(vec![
-//!         InlineNode::Text("This is a simple ".to_string()),
-//!         InlineNode::Strong(vec![InlineNode::Text("example".to_string())]),
-//!         InlineNode::Text(".".to_string()),
+//!     Node::Paragraph(vec![
+//!         Node::Text("This is a simple ".to_string()),
+//!         Node::Strong(vec![Node::Text("example".to_string())]),
+//!         Node::Text(".".to_string()),
 //!     ]),
-//! ]).into_node();
+//! ]);
 //!
 //! // Write the document as CommonMark text
 //! let mut writer = CommonMarkWriter::new();
@@ -31,15 +31,11 @@
 //! println!("{}", markdown);
 //! ```
 
-// Re-export main public API components so users can access them directly via `cmark_writer::Node`
-pub use crate::ast::{
-    Alignment, BlockNode, HtmlAttribute, HtmlElement, InlineNode, ListItem, Node,
-};
+pub use crate::ast::{Alignment, HtmlAttribute, HtmlElement, ListItem, Node};
 pub use crate::error::{WriteError, WriteResult};
 pub use crate::options::WriterOptions;
 pub use crate::writer::CommonMarkWriter;
 
-// Export public modules to allow users to access more advanced functionality
 pub mod ast;
 pub mod error;
 pub mod options;
