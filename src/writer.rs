@@ -3,7 +3,7 @@
 //! This module provides functionality to convert AST nodes to CommonMark format text.
 //! The main component is the CommonMarkWriter class, which serializes AST nodes to CommonMark-compliant text.
 
-use crate::ast::{Alignment, HtmlElement, ListItem, Node};
+use crate::ast::{Alignment, CustomNode, CustomNodeWriter, HtmlElement, ListItem, Node};
 use crate::error::{WriteError, WriteResult};
 use crate::options::WriterOptions;
 use std::{
@@ -51,6 +51,7 @@ impl NodeProcessor for BlockNodeProcessor {
                 alignments,
             } => writer.write_table(headers, rows, alignments),
             Node::HtmlBlock(content) => writer.write_html_block(content),
+            Node::Custom(custom_node) if custom_node.is_block() => writer.write_custom_node(custom_node),
             _ => Err(WriteError::UnsupportedNodeType),
         }
     }
@@ -80,6 +81,7 @@ impl NodeProcessor for InlineNodeProcessor {
             Node::InlineContainer(content) => writer.write_inline_container(content),
             Node::SoftBreak => writer.write_soft_break(),
             Node::HardBreak => writer.write_hard_break(),
+            Node::Custom(custom_node) if !custom_node.is_block() => writer.write_custom_node(custom_node),
             _ => Err(WriteError::UnsupportedNodeType),
         }
     }
@@ -149,7 +151,10 @@ impl CommonMarkWriter {
     /// writer.write(&Node::Text("Hello".to_string())).unwrap();
     /// ```
     pub fn write(&mut self, node: &Node) -> WriteResult<()> {
-        // Select appropriate processor based on node type
+        if let Node::Custom(custom_node) = node {
+            return self.write_custom_node(custom_node);
+        }
+        
         if node.is_block() {
             BlockNodeProcessor.process(self, node)
         } else if node.is_inline() {
@@ -158,6 +163,11 @@ impl CommonMarkWriter {
             // Keep this branch for future implementation needs
             Err(WriteError::UnsupportedNodeType)
         }
+    }
+
+    /// Write a custom node using its implementation
+    fn write_custom_node(&mut self, node: &Box<dyn CustomNode>) -> WriteResult<()> {
+        node.write(self)
     }
 
     /// Get context description for a node, used for error reporting
@@ -172,6 +182,7 @@ impl CommonMarkWriter {
             Node::Image { .. } => "Image alt text".to_string(),
             Node::HtmlElement(_) => "HtmlElement content".to_string(),
             Node::InlineContainer(_) => "InlineContainer".to_string(),
+            Node::Custom(_) => "Custom node".to_string(),
             _ => "Unknown inline element".to_string(),
         }
     }
@@ -439,6 +450,8 @@ impl CommonMarkWriter {
             Node::Link { content, .. } => content.iter().any(Self::node_contains_newline),
             Node::Image { alt, .. } => alt.iter().any(Self::node_contains_newline),
             Node::SoftBreak | Node::HardBreak => true,
+            // Custom nodes are handled separately
+            Node::Custom(_) => false,
             _ => false,
         }
     }
@@ -650,5 +663,18 @@ impl fmt::Display for Node {
             Ok(_) => write!(f, "{}", writer.into_string()),
             Err(e) => write!(f, "Error writing Node: {}", e),
         }
+    }
+}
+
+// Implement CustomNodeWriter trait for CommonMarkWriter
+impl CustomNodeWriter for CommonMarkWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.buffer.push_str(s);
+        Ok(())
+    }
+    
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.buffer.push(c);
+        Ok(())
     }
 }
