@@ -1,35 +1,5 @@
-//! # cmark-writer
-//!
-//! `cmark-writer` is a Rust library for writing CommonMark format.
-//!
-//! This library provides functionality to serialize in-memory data structures to CommonMark compliant text.
-//!
-//! ## Example
-//!
-//! ```rust
-//! use cmark_writer::ast::{Node, ListItem};
-//! use cmark_writer::writer::CommonMarkWriter;
-//!
-//! // Create a simple document
-//! let document = Node::Document(vec![
-//!     Node::Heading {
-//!         level: 1,
-//!         content: vec![Node::Text("Hello CommonMark".to_string())],
-//!     },
-//!     Node::Paragraph(vec![
-//!         Node::Text("This is a simple ".to_string()),
-//!         Node::Strong(vec![Node::Text("example".to_string())]),
-//!         Node::Text(".".to_string()),
-//!     ]),
-//! ]);
-//!
-//! // Write the document as CommonMark text
-//! let mut writer = CommonMarkWriter::new();
-//! writer.write(&document).expect("Failed to write document");
-//! let markdown = writer.into_string();
-//!
-//! println!("{}", markdown);
-//! ```
+#![doc = include_str!("../README.md")]
+#![deny(missing_docs)]
 
 pub use crate::ast::{Alignment, HtmlAttribute, HtmlElement, ListItem, Node};
 pub use crate::error::{WriteError, WriteResult};
