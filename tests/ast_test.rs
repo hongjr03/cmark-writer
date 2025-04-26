@@ -1,4 +1,4 @@
-use cmark_writer::ast::{Alignment, BlockNode, InlineNode, ListItem, Node};
+use cmark_writer::ast::{Alignment, ListItem, Node};
 
 #[test]
 fn test_alignment() {
@@ -17,92 +17,76 @@ fn test_alignment() {
 #[test]
 fn test_node_equality() {
     // Test inline node equality
-    let text1 = InlineNode::Text("Hello".to_string());
-    let text2 = InlineNode::Text("Hello".to_string());
-    let text3 = InlineNode::Text("World".to_string());
+    let text1 = Node::Text("Hello".to_string());
+    let text2 = Node::Text("Hello".to_string());
+    let text3 = Node::Text("World".to_string());
 
     assert_eq!(text1, text2);
     assert_ne!(text1, text3);
 
-    // Convert to Node type
-    let node1 = Node::Inline(text1);
-    let node2 = Node::Inline(text2);
-    let node3 = Node::Inline(text3);
-
-    assert_eq!(node1, node2);
-    assert_ne!(node1, node3);
-
     // Test complex node equality
-    let heading1 = BlockNode::Heading {
+    let heading1 = Node::Heading {
         level: 2,
-        content: vec![InlineNode::Text("Title".to_string())],
+        content: vec![Node::Text("Title".to_string())],
     };
 
-    let heading2 = BlockNode::Heading {
+    let heading2 = Node::Heading {
         level: 2,
-        content: vec![InlineNode::Text("Title".to_string())],
+        content: vec![Node::Text("Title".to_string())],
     };
 
-    let heading3 = BlockNode::Heading {
+    let heading3 = Node::Heading {
         level: 3, // Different level
-        content: vec![InlineNode::Text("Title".to_string())],
+        content: vec![Node::Text("Title".to_string())],
     };
 
     assert_eq!(heading1, heading2);
     assert_ne!(heading1, heading3);
-
-    // Convert to Node type
-    let node_heading1 = Node::Block(heading1);
-    let node_heading2 = Node::Block(heading2);
-    let node_heading3 = Node::Block(heading3);
-
-    assert_eq!(node_heading1, node_heading2);
-    assert_ne!(node_heading1, node_heading3);
 }
 
 #[test]
 fn test_document_creation() {
     // Create a test document and verify its structure
-    let document = BlockNode::Document(vec![
-        BlockNode::Heading {
+    let document = Node::Document(vec![
+        Node::Heading {
             level: 1,
-            content: vec![InlineNode::Text("Document Title".to_string())],
+            content: vec![Node::Text("Document Title".to_string())],
         },
-        BlockNode::Paragraph(vec![
-            InlineNode::Text("Paragraph with ".to_string()),
-            InlineNode::Emphasis(vec![InlineNode::Text("emphasis".to_string())]),
-            InlineNode::Text(" and ".to_string()),
-            InlineNode::Strong(vec![InlineNode::Text("strong".to_string())]),
-            InlineNode::Text(" text.".to_string()),
+        Node::Paragraph(vec![
+            Node::Text("Paragraph with ".to_string()),
+            Node::Emphasis(vec![Node::Text("emphasis".to_string())]),
+            Node::Text(" and ".to_string()),
+            Node::Strong(vec![Node::Text("strong".to_string())]),
+            Node::Text(" text.".to_string()),
         ]),
     ]);
 
     // Check document structure
-    if let BlockNode::Document(children) = &document {
+    if let Node::Document(children) = &document {
         assert_eq!(children.len(), 2);
 
         // Verify heading
-        if let BlockNode::Heading { level, content } = &children[0] {
+        if let Node::Heading { level, content } = &children[0] {
             assert_eq!(*level, 1);
             assert_eq!(content.len(), 1);
-            assert_eq!(content[0], InlineNode::Text("Document Title".to_string()));
+            assert_eq!(content[0], Node::Text("Document Title".to_string()));
         } else {
             panic!("First child should be a heading");
         }
 
         // Verify paragraph
-        if let BlockNode::Paragraph(content) = &children[1] {
+        if let Node::Paragraph(content) = &children[1] {
             assert_eq!(content.len(), 5);
-            assert_eq!(content[0], InlineNode::Text("Paragraph with ".to_string()));
+            assert_eq!(content[0], Node::Text("Paragraph with ".to_string()));
 
-            if let InlineNode::Emphasis(emph_content) = &content[1] {
-                assert_eq!(emph_content[0], InlineNode::Text("emphasis".to_string()));
+            if let Node::Emphasis(emph_content) = &content[1] {
+                assert_eq!(emph_content[0], Node::Text("emphasis".to_string()));
             } else {
                 panic!("Second element should be emphasis");
             }
 
-            if let InlineNode::Strong(strong_content) = &content[3] {
-                assert_eq!(strong_content[0], InlineNode::Text("strong".to_string()));
+            if let Node::Strong(strong_content) = &content[3] {
+                assert_eq!(strong_content[0], Node::Text("strong".to_string()));
             } else {
                 panic!("Fourth element should be strong");
             }
@@ -116,59 +100,65 @@ fn test_document_creation() {
 
 #[test]
 fn test_list_item() {
-    // Test task list item
-    let task_item = ListItem::Task {
-        completed: false,
-        content: vec![BlockNode::Paragraph(vec![InlineNode::Text(
-            "Task item".to_string(),
+    // 测试无序列表项
+    let unordered_item = ListItem::Unordered {
+        content: vec![Node::Paragraph(vec![Node::Text(
+            "Unordered item".to_string(),
         )])],
     };
 
-    if let ListItem::Task { completed, content } = &task_item {
-        assert!(!completed);
+    if let ListItem::Unordered { content } = &unordered_item {
         assert_eq!(content.len(), 1);
-        if let BlockNode::Paragraph(text) = &content[0] {
-            assert_eq!(text[0], InlineNode::Text("Task item".to_string()));
+        if let Node::Paragraph(text) = &content[0] {
+            assert_eq!(text[0], Node::Text("Unordered item".to_string()));
         } else {
             panic!("Content should be a paragraph");
         }
     } else {
-        panic!("Should be a task list item");
+        panic!("Should be an unordered list item");
     }
 
-    // Test completed task list item
-    let completed_task = ListItem::Task {
-        completed: true,
-        content: vec![BlockNode::Paragraph(vec![InlineNode::Text(
-            "Completed task".to_string(),
+    // 测试有序列表项
+    let ordered_item = ListItem::Ordered {
+        number: Some(3),
+        content: vec![Node::Paragraph(vec![Node::Text(
+            "Ordered item".to_string(),
         )])],
     };
 
-    if let ListItem::Task {
-        completed,
-        content: _,
-    } = &completed_task
-    {
-        assert!(*completed);
-    } else {
-        panic!("Should be a task list item");
-    }
-
-    // Test regular list item
-    let regular_item = ListItem::Regular {
-        content: vec![BlockNode::Paragraph(vec![InlineNode::Text(
-            "Regular item".to_string(),
-        )])],
-    };
-
-    if let ListItem::Regular { content } = &regular_item {
+    if let ListItem::Ordered { number, content } = &ordered_item {
+        assert_eq!(*number, Some(3));
         assert_eq!(content.len(), 1);
-        if let BlockNode::Paragraph(text) = &content[0] {
-            assert_eq!(text[0], InlineNode::Text("Regular item".to_string()));
+        if let Node::Paragraph(text) = &content[0] {
+            assert_eq!(text[0], Node::Text("Ordered item".to_string()));
         } else {
             panic!("Content should be a paragraph");
         }
     } else {
-        panic!("Should be a regular list item");
+        panic!("Should be an ordered list item");
     }
+}
+
+#[test]
+fn test_node_type_checking() {
+    // Test block node type checking
+    let heading = Node::Heading {
+        level: 1,
+        content: vec![Node::Text("Heading".to_string())],
+    };
+    assert!(heading.is_block());
+    assert!(!heading.is_inline());
+
+    // Test inline node type checking
+    let text = Node::Text("Hello".to_string());
+    assert!(text.is_inline());
+    assert!(!text.is_block());
+
+    // Test nested nodes
+    let paragraph = Node::Paragraph(vec![
+        Node::Text("Text with ".to_string()),
+        Node::Emphasis(vec![Node::Text("emphasis".to_string())]),
+    ]);
+    assert!(paragraph.is_block());
+    assert!(!paragraph.is_inline());
 }
