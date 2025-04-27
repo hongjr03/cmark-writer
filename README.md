@@ -66,6 +66,56 @@ writer.write(&Node::Text("Example".to_string())).unwrap();
 - `CommonMarkWriter` - Converts nodes to CommonMark text
 - `WriterOptions` - Customization options for the writer
 
+### Creating Custom Nodes
+
+You can extend the CommonMark syntax with your own custom nodes:
+
+```rust
+use cmark_writer::ast::{CustomNodeWriter, Node};
+use cmark_writer::error::WriteResult;
+use cmark_writer::derive_custom_node;
+
+// Define a custom highlight node
+#[derive(Debug, Clone, PartialEq)]
+struct HighlightNode {
+    content: String,
+    color: String,
+}
+
+// Implement the custom node using the macro
+derive_custom_node!(HighlightNode);
+
+// Implement the required methods
+impl HighlightNode {
+    // Custom node writing logic
+    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        writer.write_str("<span style=\"background-color: ")?;
+        writer.write_str(&self.color)?;
+        writer.write_str("\">")?;
+        writer.write_str(&self.content)?;
+        writer.write_str("</span>")?;
+        Ok(())
+    }
+    
+    // Determine if it's a block or inline element
+    fn is_block_custom(&self) -> bool {
+        false // This is an inline element
+    }
+}
+
+// Use your custom node
+let document = Node::Document(vec![
+    Node::Paragraph(vec![
+        Node::Text("Here's some text with a ".to_string()),
+        Node::Custom(Box::new(HighlightNode {
+            content: "highlighted section".to_string(),
+            color: "yellow".to_string(),
+        })),
+        Node::Text(".".to_string()),
+    ]),
+]);
+```
+
 ## Development
 
 ### Building
