@@ -2,6 +2,27 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.5.0] - 2025-04-27
+
+### Features
+
+- Implemented custom node macros and refactored project architecture
+
+### Documentation
+
+- Updated README.md, removed main function and improved example clarity
+
+## [0.4.0] - 2025-04-26
+
+### Features
+
+- Added support for custom nodes in AST
+- Implemented writing logic for custom nodes in CommonMark
+
+### Changes
+
+- Updated project version to 0.4.0
+
 ## [0.3.0] - 2025-04-26
 
 ### Features
