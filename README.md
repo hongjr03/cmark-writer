@@ -15,27 +15,25 @@ A CommonMark writer implementation in Rust.
 use cmark_writer::ast::{Node, ListItem};
 use cmark_writer::writer::CommonMarkWriter;
 
-fn main() {
-    // Create a document
-    let document = Node::Document(vec![
-        Node::Heading {
-            level: 1,
-            content: vec![Node::Text("Hello CommonMark".to_string())],
-        },
-        Node::Paragraph(vec![
-            Node::Text("This is a simple ".to_string()),
-            Node::Strong(vec![Node::Text("example".to_string())]),
-            Node::Text(".".to_string()),
-        ]),
-    ]);
-    
-    // Render to CommonMark
-    let mut writer = CommonMarkWriter::new();
-    writer.write(&document).expect("Failed to write document");
-    let markdown = writer.into_string();
-    
-    println!("{}", markdown);
-}
+// Create a document
+let document = Node::Document(vec![
+    Node::Heading {
+        level: 1,
+        content: vec![Node::Text("Hello CommonMark".to_string())],
+    },
+    Node::Paragraph(vec![
+        Node::Text("This is a simple ".to_string()),
+        Node::Strong(vec![Node::Text("example".to_string())]),
+        Node::Text(".".to_string()),
+    ]),
+]);
+
+// Render to CommonMark
+let mut writer = CommonMarkWriter::new();
+writer.write(&document).expect("Failed to write document");
+let markdown = writer.into_string();
+
+println!("{}", markdown);
 ```
 
 ### Custom Formatting Options
