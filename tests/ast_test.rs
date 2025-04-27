@@ -100,7 +100,6 @@ fn test_document_creation() {
 
 #[test]
 fn test_list_item() {
-    // 测试无序列表项
     let unordered_item = ListItem::Unordered {
         content: vec![Node::Paragraph(vec![Node::Text(
             "Unordered item".to_string(),
@@ -118,7 +117,6 @@ fn test_list_item() {
         panic!("Should be an unordered list item");
     }
 
-    // 测试有序列表项
     let ordered_item = ListItem::Ordered {
         number: Some(3),
         content: vec![Node::Paragraph(vec![Node::Text(

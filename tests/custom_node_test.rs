@@ -1,18 +1,23 @@
-use cmark_writer::ast::{CustomNode, CustomNodeWriter, Node};
+use cmark_writer::ast::{CustomNodeWriter, Node};
 use cmark_writer::writer::CommonMarkWriter;
 use cmark_writer::WriteResult;
-use std::any::Any;
 
 // A simple custom node example: representing highlighted text
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 struct HighlightNode {
     content: String,
     color: String,
 }
 
-// Implement the CustomNode trait
-impl CustomNode for HighlightNode {
-    fn write(&self, writer: &mut dyn CustomNodeWriter) -> cmark_writer::error::WriteResult<()> {
+// Using macro to implement CustomNode trait
+cmark_writer::derive_custom_node!(HighlightNode);
+
+// Implementing required methods for HighlightNode
+impl HighlightNode {
+    fn write_custom(
+        &self,
+        writer: &mut dyn CustomNodeWriter,
+    ) -> cmark_writer::error::WriteResult<()> {
         // Implement custom writing logic
         writer.write_str("<span style=\"background-color: ")?;
         writer.write_str(&self.color)?;
@@ -22,41 +27,28 @@ impl CustomNode for HighlightNode {
         Ok(())
     }
 
-    fn clone_box(&self) -> Box<dyn CustomNode> {
-        Box::new(Self {
-            content: self.content.clone(),
-            color: self.color.clone(),
-        })
-    }
-
-    fn eq_box(&self, other: &dyn CustomNode) -> bool {
-        // Try to downcast other to HighlightNode
-        if let Some(other) = other.as_any().downcast_ref::<HighlightNode>() {
-            self == other
-        } else {
-            false
-        }
-    }
-
-    fn is_block(&self) -> bool {
+    fn is_block_custom(&self) -> bool {
         false // This is an inline element
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
 // Example of a custom block-level node implementation
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 struct CalloutNode {
     title: String,
     content: String,
     style: String, // e.g.: note, warning, danger
 }
 
-impl CustomNode for CalloutNode {
-    fn write(&self, writer: &mut dyn CustomNodeWriter) -> cmark_writer::error::WriteResult<()> {
+// Using macro to implement CustomNode trait
+cmark_writer::derive_custom_node!(CalloutNode);
+
+// Implementing required methods for CalloutNode
+impl CalloutNode {
+    fn write_custom(
+        &self,
+        writer: &mut dyn CustomNodeWriter,
+    ) -> cmark_writer::error::WriteResult<()> {
         writer.write_str("<div class=\"callout callout-")?;
         writer.write_str(&self.style)?;
         writer.write_str("\">\n")?;
@@ -73,28 +65,8 @@ impl CustomNode for CalloutNode {
         Ok(())
     }
 
-    fn clone_box(&self) -> Box<dyn CustomNode> {
-        Box::new(Self {
-            title: self.title.clone(),
-            content: self.content.clone(),
-            style: self.style.clone(),
-        })
-    }
-
-    fn eq_box(&self, other: &dyn CustomNode) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<CalloutNode>() {
-            self == other
-        } else {
-            false
-        }
-    }
-
-    fn is_block(&self) -> bool {
+    fn is_block_custom(&self) -> bool {
         true // This is a block-level element
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -181,8 +153,21 @@ struct FigureNode {
     id: Option<String>,
 }
 
-impl CustomNode for FigureNode {
-    fn write(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+// Using macro to implement CustomNode trait
+cmark_writer::derive_custom_node!(FigureNode);
+
+impl FigureNode {
+    // Helper method to write a node to the provided writer
+    fn write_node(&self, node: &Node, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        // We need to use a temporary CommonMarkWriter to render the node
+        let mut temp_writer = CommonMarkWriter::new();
+        temp_writer.write(node)?;
+        let content = temp_writer.into_string();
+        writer.write_str(&content)?;
+        Ok(())
+    }
+
+    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
         // Start the figure element with optional ID
         writer.write_str("<figure")?;
         if let Some(id) = &self.id {
@@ -231,40 +216,8 @@ impl CustomNode for FigureNode {
         Ok(())
     }
 
-    fn clone_box(&self) -> Box<dyn CustomNode> {
-        Box::new(Self {
-            body: self.body.clone(),
-            caption: self.caption.clone(),
-            id: self.id.clone(),
-        })
-    }
-
-    fn eq_box(&self, other: &dyn CustomNode) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<FigureNode>() {
-            self == other
-        } else {
-            false
-        }
-    }
-
-    fn is_block(&self) -> bool {
+    fn is_block_custom(&self) -> bool {
         true // Figure is always a block-level element
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl FigureNode {
-    // Helper method to write a node to the provided writer
-    fn write_node(&self, node: &Node, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
-        // We need to use a temporary CommonMarkWriter to render the node
-        let mut temp_writer = CommonMarkWriter::new();
-        temp_writer.write(node)?;
-        let content = temp_writer.into_string();
-        writer.write_str(&content)?;
-        Ok(())
     }
 }
 
@@ -377,5 +330,74 @@ fn test_figure_in_document() {
         + "</figure>\n\n"
         + "Text after the figure.";
 
+    assert_eq!(writer.into_string(), expected);
+}
+
+#[test]
+fn test_derive_custom_node_macro() {
+    use cmark_writer::ast::{CustomNodeWriter, Node};
+    use cmark_writer::error::WriteResult;
+    use cmark_writer::writer::CommonMarkWriter;
+
+    // A simple alert box custom node using the macro
+    #[derive(Debug, Clone, PartialEq)]
+    struct AlertBox {
+        message: String,
+        level: String, // info, warning, error
+    }
+
+    // Use the macro to implement CustomNode trait
+    cmark_writer::derive_custom_node!(AlertBox);
+
+    // Implement the required methods for AlertBox
+    impl AlertBox {
+        fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+            writer.write_str("<div class=\"alert alert-")?;
+            writer.write_str(&self.level)?;
+            writer.write_str("\">\n")?;
+            writer.write_str("  <p>")?;
+            writer.write_str(&self.message)?;
+            writer.write_str("</p>\n")?;
+            writer.write_str("</div>")?;
+            Ok(())
+        }
+
+        fn is_block_custom(&self) -> bool {
+            true // This is a block element
+        }
+    }
+
+    // Create an instance of our custom node
+    let alert = Node::Custom(Box::new(AlertBox {
+        message: "This is an important alert message.".to_string(),
+        level: "warning".to_string(),
+    }));
+
+    // Test rendering the custom node
+    let mut writer = CommonMarkWriter::new();
+    writer.write(&alert).unwrap();
+
+    let expected =
+        "<div class=\"alert alert-warning\">\n  <p>This is an important alert message.</p>\n</div>";
+    assert_eq!(writer.into_string(), expected);
+
+    // Test using the custom node in a document
+    let document = Node::Document(vec![
+        Node::Heading {
+            level: 1,
+            content: vec![Node::Text("Document with Alert".to_string())],
+        },
+        Node::Paragraph(vec![Node::Text("Text before alert.".to_string())]),
+        Node::Custom(Box::new(AlertBox {
+            message: "This is an important alert message.".to_string(),
+            level: "warning".to_string(),
+        })),
+        Node::Paragraph(vec![Node::Text("Text after alert.".to_string())]),
+    ]);
+
+    let mut writer = CommonMarkWriter::new();
+    writer.write(&document).unwrap();
+
+    let expected = "# Document with Alert\n\nText before alert.\n\n<div class=\"alert alert-warning\">\n  <p>This is an important alert message.</p>\n</div>\n\nText after alert.";
     assert_eq!(writer.into_string(), expected);
 }

@@ -1,7 +1,6 @@
 //! CommonMark writer implementation.
 //!
-//! This module provides functionality to convert AST nodes to CommonMark format text.
-//! The main component is the CommonMarkWriter class, which serializes AST nodes to CommonMark-compliant text.
+//! This file contains the implementation of the CommonMarkWriter class, which serializes AST nodes to CommonMark-compliant text.
 
 use crate::ast::{Alignment, CustomNode, CustomNodeWriter, HtmlElement, ListItem, Node};
 use crate::error::{WriteError, WriteResult};
@@ -10,6 +9,8 @@ use std::{
     cmp::max,
     fmt::{self},
 };
+
+use super::processors::{BlockNodeProcessor, InlineNodeProcessor, NodeProcessor};
 
 /// CommonMark writer
 ///
@@ -20,71 +21,6 @@ pub struct CommonMarkWriter {
     buffer: String,
     /// Current indentation level
     indent_level: usize,
-}
-
-/// Private trait for node processing strategy
-trait NodeProcessor {
-    /// Process a node and write its content
-    fn process(&self, writer: &mut CommonMarkWriter, node: &Node) -> WriteResult<()>;
-}
-
-/// Strategy for processing block nodes
-struct BlockNodeProcessor;
-
-/// Strategy for processing inline nodes
-struct InlineNodeProcessor;
-
-impl NodeProcessor for BlockNodeProcessor {
-    fn process(&self, writer: &mut CommonMarkWriter, node: &Node) -> WriteResult<()> {
-        match node {
-            Node::Document(children) => writer.write_document(children),
-            Node::Heading { level, content } => writer.write_heading(*level, content),
-            Node::Paragraph(content) => writer.write_paragraph(content),
-            Node::BlockQuote(content) => writer.write_blockquote(content),
-            Node::CodeBlock { language, content } => writer.write_code_block(language, content),
-            Node::UnorderedList(items) => writer.write_unordered_list(items),
-            Node::OrderedList { start, items } => writer.write_ordered_list(*start, items),
-            Node::ThematicBreak => writer.write_thematic_break(),
-            Node::Table {
-                headers,
-                rows,
-                alignments,
-            } => writer.write_table(headers, rows, alignments),
-            Node::HtmlBlock(content) => writer.write_html_block(content),
-            Node::Custom(custom_node) if custom_node.is_block() => writer.write_custom_node(custom_node),
-            _ => Err(WriteError::UnsupportedNodeType),
-        }
-    }
-}
-
-impl NodeProcessor for InlineNodeProcessor {
-    fn process(&self, writer: &mut CommonMarkWriter, node: &Node) -> WriteResult<()> {
-        // Check for newlines in inline nodes in strict mode
-        if writer.options.strict && !matches!(node, Node::SoftBreak | Node::HardBreak) {
-            let context = writer.get_context_for_node(node);
-            writer.check_no_newline(node, &context)?;
-        }
-
-        match node {
-            Node::Text(content) => writer.write_text_content(content),
-            Node::Emphasis(content) => writer.write_delimited(content, "*"),
-            Node::Strong(content) => writer.write_delimited(content, "**"),
-            Node::Strike(content) => writer.write_delimited(content, "~~"),
-            Node::InlineCode(content) => writer.write_code_content(content),
-            Node::Link {
-                url,
-                title,
-                content,
-            } => writer.write_link(url, title, content),
-            Node::Image { url, title, alt } => writer.write_image(url, title, alt),
-            Node::HtmlElement(element) => writer.write_html_element(element),
-            Node::InlineContainer(content) => writer.write_inline_container(content),
-            Node::SoftBreak => writer.write_soft_break(),
-            Node::HardBreak => writer.write_hard_break(),
-            Node::Custom(custom_node) if !custom_node.is_block() => writer.write_custom_node(custom_node),
-            _ => Err(WriteError::UnsupportedNodeType),
-        }
-    }
 }
 
 impl CommonMarkWriter {
@@ -131,6 +67,11 @@ impl CommonMarkWriter {
         }
     }
 
+    /// Whether the writer is in strict mode
+    pub(crate) fn is_strict_mode(&self) -> bool {
+        self.options.strict
+    }
+
     /// Write an AST node as CommonMark format
     ///
     /// # Parameters
@@ -154,7 +95,7 @@ impl CommonMarkWriter {
         if let Node::Custom(custom_node) = node {
             return self.write_custom_node(custom_node);
         }
-        
+
         if node.is_block() {
             BlockNodeProcessor.process(self, node)
         } else if node.is_inline() {
@@ -166,12 +107,12 @@ impl CommonMarkWriter {
     }
 
     /// Write a custom node using its implementation
-    fn write_custom_node(&mut self, node: &Box<dyn CustomNode>) -> WriteResult<()> {
+    pub(crate) fn write_custom_node(&mut self, node: &Box<dyn CustomNode>) -> WriteResult<()> {
         node.write(self)
     }
 
     /// Get context description for a node, used for error reporting
-    fn get_context_for_node(&self, node: &Node) -> String {
+    pub(crate) fn get_context_for_node(&self, node: &Node) -> String {
         match node {
             Node::Text(_) => "Text".to_string(),
             Node::Emphasis(_) => "Emphasis".to_string(),
@@ -187,8 +128,34 @@ impl CommonMarkWriter {
         }
     }
 
+    /// Check if the inline node contains a newline character and return an error if it does
+    pub(crate) fn check_no_newline(&self, node: &Node, context: &str) -> WriteResult<()> {
+        if Self::node_contains_newline(node) {
+            return Err(WriteError::NewlineInInlineElement(context.to_string()));
+        }
+        Ok(())
+    }
+
+    /// Check if the inline node contains a newline character recursively
+    fn node_contains_newline(node: &Node) -> bool {
+        match node {
+            Node::Text(s) | Node::InlineCode(s) => s.contains('\n'),
+            Node::Emphasis(children)
+            | Node::Strong(children)
+            | Node::Strike(children)
+            | Node::InlineContainer(children) => children.iter().any(Self::node_contains_newline),
+            Node::HtmlElement(element) => element.children.iter().any(Self::node_contains_newline),
+            Node::Link { content, .. } => content.iter().any(Self::node_contains_newline),
+            Node::Image { alt, .. } => alt.iter().any(Self::node_contains_newline),
+            Node::SoftBreak | Node::HardBreak => true,
+            // Custom nodes are handled separately
+            Node::Custom(_) => false,
+            _ => false,
+        }
+    }
+
     /// Writes text content with character escaping
-    fn write_text_content(&mut self, content: &str) -> WriteResult<()> {
+    pub(crate) fn write_text_content(&mut self, content: &str) -> WriteResult<()> {
         let escaped = content
             .replace('\\', "\\\\")
             .replace('*', "\\*")
@@ -204,7 +171,7 @@ impl CommonMarkWriter {
     }
 
     /// Writes inline code content
-    fn write_code_content(&mut self, content: &str) -> WriteResult<()> {
+    pub(crate) fn write_code_content(&mut self, content: &str) -> WriteResult<()> {
         self.write_char('`')?;
         self.write_str(content)?;
         self.write_char('`')?;
@@ -212,7 +179,7 @@ impl CommonMarkWriter {
     }
 
     /// Helper function for writing content with delimiters
-    fn write_delimited(&mut self, content: &[Node], delimiter: &str) -> WriteResult<()> {
+    pub(crate) fn write_delimited(&mut self, content: &[Node], delimiter: &str) -> WriteResult<()> {
         self.write_str(delimiter)?;
 
         for node in content {
@@ -224,7 +191,7 @@ impl CommonMarkWriter {
     }
 
     /// Write a document node
-    fn write_document(&mut self, children: &[Node]) -> WriteResult<()> {
+    pub(crate) fn write_document(&mut self, children: &[Node]) -> WriteResult<()> {
         for (i, child) in children.iter().enumerate() {
             self.write(child)?;
             if i < children.len() - 1 {
@@ -235,7 +202,7 @@ impl CommonMarkWriter {
     }
 
     /// Write a heading node
-    fn write_heading(&mut self, level: u8, content: &[Node]) -> WriteResult<()> {
+    pub(crate) fn write_heading(&mut self, level: u8, content: &[Node]) -> WriteResult<()> {
         if !(1..=6).contains(&level) {
             return Err(WriteError::InvalidHeadingLevel(level));
         }
@@ -253,7 +220,7 @@ impl CommonMarkWriter {
     }
 
     /// Write a paragraph node
-    fn write_paragraph(&mut self, content: &[Node]) -> WriteResult<()> {
+    pub(crate) fn write_paragraph(&mut self, content: &[Node]) -> WriteResult<()> {
         for node in content.iter() {
             self.write(node)?;
         }
@@ -261,7 +228,7 @@ impl CommonMarkWriter {
     }
 
     /// Write a blockquote node
-    fn write_blockquote(&mut self, content: &[Node]) -> WriteResult<()> {
+    pub(crate) fn write_blockquote(&mut self, content: &[Node]) -> WriteResult<()> {
         self.indent_level += 1;
 
         for (i, node) in content.iter().enumerate() {
@@ -277,7 +244,11 @@ impl CommonMarkWriter {
     }
 
     /// Write a code block node
-    fn write_code_block(&mut self, language: &Option<String>, content: &str) -> WriteResult<()> {
+    pub(crate) fn write_code_block(
+        &mut self,
+        language: &Option<String>,
+        content: &str,
+    ) -> WriteResult<()> {
         let max_backticks = content
             .chars()
             .fold((0, 0), |(max, current), c| {
@@ -309,7 +280,7 @@ impl CommonMarkWriter {
     }
 
     /// Write an unordered list node
-    fn write_unordered_list(&mut self, items: &[ListItem]) -> WriteResult<()> {
+    pub(crate) fn write_unordered_list(&mut self, items: &[ListItem]) -> WriteResult<()> {
         for (i, item) in items.iter().enumerate() {
             self.write_list_item(item, "- ")?;
             if i < items.len() - 1 {
@@ -320,7 +291,7 @@ impl CommonMarkWriter {
     }
 
     /// Write an ordered list node
-    fn write_ordered_list(&mut self, start: u32, items: &[ListItem]) -> WriteResult<()> {
+    pub(crate) fn write_ordered_list(&mut self, start: u32, items: &[ListItem]) -> WriteResult<()> {
         // Track the current item number
         let mut current_number = start;
 
@@ -425,39 +396,13 @@ impl CommonMarkWriter {
     }
 
     /// Write a thematic break (horizontal rule)
-    fn write_thematic_break(&mut self) -> WriteResult<()> {
+    pub(crate) fn write_thematic_break(&mut self) -> WriteResult<()> {
         self.write_str("---")?;
         Ok(())
     }
 
-    /// Check if the inline node contains a newline character and return an error if it does
-    fn check_no_newline(&self, node: &Node, context: &str) -> WriteResult<()> {
-        if Self::node_contains_newline(node) {
-            return Err(WriteError::NewlineInInlineElement(context.to_string()));
-        }
-        Ok(())
-    }
-
-    /// Check if the inline node contains a newline character recursively
-    fn node_contains_newline(node: &Node) -> bool {
-        match node {
-            Node::Text(s) | Node::InlineCode(s) => s.contains('\n'),
-            Node::Emphasis(children)
-            | Node::Strong(children)
-            | Node::Strike(children)
-            | Node::InlineContainer(children) => children.iter().any(Self::node_contains_newline),
-            Node::HtmlElement(element) => element.children.iter().any(Self::node_contains_newline),
-            Node::Link { content, .. } => content.iter().any(Self::node_contains_newline),
-            Node::Image { alt, .. } => alt.iter().any(Self::node_contains_newline),
-            Node::SoftBreak | Node::HardBreak => true,
-            // Custom nodes are handled separately
-            Node::Custom(_) => false,
-            _ => false,
-        }
-    }
-
     /// Write a table
-    fn write_table(
+    pub(crate) fn write_table(
         &mut self,
         headers: &[Node],
         rows: &[Vec<Node>],
@@ -501,7 +446,7 @@ impl CommonMarkWriter {
     }
 
     /// Write a link
-    fn write_link(
+    pub(crate) fn write_link(
         &mut self,
         url: &str,
         title: &Option<String>,
@@ -530,7 +475,12 @@ impl CommonMarkWriter {
     }
 
     /// Write an image
-    fn write_image(&mut self, url: &str, title: &Option<String>, alt: &[Node]) -> WriteResult<()> {
+    pub(crate) fn write_image(
+        &mut self,
+        url: &str,
+        title: &Option<String>,
+        alt: &[Node],
+    ) -> WriteResult<()> {
         // Check for newlines in alt text content
         for node in alt {
             self.check_no_newline(node, "Image alt text")?;
@@ -557,13 +507,13 @@ impl CommonMarkWriter {
     }
 
     /// Write a soft line break
-    fn write_soft_break(&mut self) -> WriteResult<()> {
+    pub(crate) fn write_soft_break(&mut self) -> WriteResult<()> {
         self.write_char('\n')?;
         Ok(())
     }
 
     /// Write a hard line break
-    fn write_hard_break(&mut self) -> WriteResult<()> {
+    pub(crate) fn write_hard_break(&mut self) -> WriteResult<()> {
         if self.options.hard_break_spaces {
             self.write_str("  \n")?;
         } else {
@@ -604,13 +554,13 @@ impl CommonMarkWriter {
     }
 
     /// Write an HTML block
-    fn write_html_block(&mut self, content: &str) -> WriteResult<()> {
+    pub(crate) fn write_html_block(&mut self, content: &str) -> WriteResult<()> {
         self.write_str(content)?;
         Ok(())
     }
 
     /// Write an HTML element
-    fn write_html_element(&mut self, element: &HtmlElement) -> WriteResult<()> {
+    pub(crate) fn write_html_element(&mut self, element: &HtmlElement) -> WriteResult<()> {
         self.write_char('<')?;
         self.write_str(&element.tag)?;
 
@@ -641,7 +591,7 @@ impl CommonMarkWriter {
     }
 
     /// Write inline container content
-    fn write_inline_container(&mut self, content: &[Node]) -> WriteResult<()> {
+    pub(crate) fn write_inline_container(&mut self, content: &[Node]) -> WriteResult<()> {
         for node in content {
             self.write(node)?;
         }
@@ -672,7 +622,7 @@ impl CustomNodeWriter for CommonMarkWriter {
         self.buffer.push_str(s);
         Ok(())
     }
-    
+
     fn write_char(&mut self, c: char) -> fmt::Result {
         self.buffer.push(c);
         Ok(())

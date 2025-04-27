@@ -1,9 +1,8 @@
-//! Abstract Syntax Tree for CommonMark document structure.
-//!
-//! This module defines various node types for representing CommonMark documents,
-//! including headings, paragraphs, lists, code blocks, etc.
+//! Node definitions for the CommonMark AST.
 
-use std::any::Any;
+use super::custom::CustomNode;
+use super::html::HtmlElement;
+use std::boxed::Box;
 
 /// Main node type, representing an element in a CommonMark document
 #[derive(Debug, Clone, PartialEq)]
@@ -108,7 +107,7 @@ pub enum Node {
 
     /// Hard break (two spaces followed by a line break, or backslash followed by a line break)
     HardBreak,
-    
+
     /// Custom node that allows users to implement their own writing behavior
     Custom(Box<dyn CustomNode>),
 }
@@ -141,28 +140,6 @@ pub enum Alignment {
     Center,
     /// Right alignment
     Right,
-}
-
-/// Represents an HTML attribute, containing name and value
-#[derive(Debug, Clone, PartialEq)]
-pub struct HtmlAttribute {
-    /// Attribute name
-    pub name: String,
-    /// Attribute value
-    pub value: String,
-}
-
-/// Represents an HTML element, containing tag name, attributes, and child nodes
-#[derive(Debug, Clone, PartialEq)]
-pub struct HtmlElement {
-    /// Element tag name
-    pub tag: String,
-    /// Element attributes
-    pub attributes: Vec<HtmlAttribute>,
-    /// Element child nodes (can only contain inline nodes)
-    pub children: Vec<Node>,
-    /// Whether it's a self-closing tag (e.g. <img />)
-    pub self_closing: bool,
 }
 
 impl Node {
@@ -201,46 +178,5 @@ impl Node {
                 | Node::HardBreak
                 | Node::Custom(_)
         )
-    }
-}
-
-/// Trait for implementing custom node behavior
-pub trait CustomNode: std::fmt::Debug + Send + Sync {
-    /// Write the custom node content to the provided writer
-    fn write(&self, writer: &mut dyn CustomNodeWriter) -> crate::error::WriteResult<()>;
-    
-    /// Clone the custom node
-    fn clone_box(&self) -> Box<dyn CustomNode>;
-    
-    /// Check if two custom nodes are equal
-    fn eq_box(&self, other: &dyn CustomNode) -> bool;
-    
-    /// Whether the custom node is a block element
-    fn is_block(&self) -> bool;
-    
-    /// Convert to Any for type casting
-    fn as_any(&self) -> &dyn Any;
-}
-
-/// Trait for custom node writer implementation
-pub trait CustomNodeWriter {
-    /// Write a string to the output
-    fn write_str(&mut self, s: &str) -> std::fmt::Result;
-    
-    /// Write a character to the output
-    fn write_char(&mut self, c: char) -> std::fmt::Result;
-}
-
-// Implement Clone for Box<dyn CustomNode>
-impl Clone for Box<dyn CustomNode> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}
-
-// Implement PartialEq for Box<dyn CustomNode>
-impl PartialEq for Box<dyn CustomNode> {
-    fn eq(&self, other: &Self) -> bool {
-        self.eq_box(&**other)
     }
 }
