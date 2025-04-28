@@ -1,18 +1,18 @@
-use cmark_writer::ast::{Alignment, ListItem, Node};
+use cmark_writer::ast::{HeadingType, ListItem, Node};
 
-#[test]
-fn test_alignment() {
-    // Test alignment
-    let alignment = Alignment::Center;
-    assert_eq!(alignment, Alignment::Center);
+// #[test]
+// fn test_alignment() {
+//     // Test alignment
+//     let alignment = Alignment::Center;
+//     assert_eq!(alignment, Alignment::Center);
 
-    // Test different alignments
-    let left_alignment = Alignment::Left;
-    let right_alignment = Alignment::Right;
+//     // Test different alignments
+//     let left_alignment = Alignment::Left;
+//     let right_alignment = Alignment::Right;
 
-    assert_ne!(alignment, left_alignment);
-    assert_ne!(alignment, right_alignment);
-}
+//     assert_ne!(alignment, left_alignment);
+//     assert_ne!(alignment, right_alignment);
+// }
 
 #[test]
 fn test_node_equality() {
@@ -28,16 +28,19 @@ fn test_node_equality() {
     let heading1 = Node::Heading {
         level: 2,
         content: vec![Node::Text("Title".to_string())],
+        heading_type: HeadingType::Atx,
     };
 
     let heading2 = Node::Heading {
         level: 2,
         content: vec![Node::Text("Title".to_string())],
+        heading_type: HeadingType::Atx,
     };
 
     let heading3 = Node::Heading {
         level: 3, // Different level
         content: vec![Node::Text("Title".to_string())],
+        heading_type: HeadingType::Atx,
     };
 
     assert_eq!(heading1, heading2);
@@ -51,6 +54,7 @@ fn test_document_creation() {
         Node::Heading {
             level: 1,
             content: vec![Node::Text("Document Title".to_string())],
+            heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![
             Node::Text("Paragraph with ".to_string()),
@@ -66,7 +70,12 @@ fn test_document_creation() {
         assert_eq!(children.len(), 2);
 
         // Verify heading
-        if let Node::Heading { level, content } = &children[0] {
+        if let Node::Heading {
+            level,
+            content,
+            heading_type: _,
+        } = &children[0]
+        {
             assert_eq!(*level, 1);
             assert_eq!(content.len(), 1);
             assert_eq!(content[0], Node::Text("Document Title".to_string()));
@@ -143,6 +152,7 @@ fn test_node_type_checking() {
     let heading = Node::Heading {
         level: 1,
         content: vec![Node::Text("Heading".to_string())],
+        heading_type: HeadingType::Atx,
     };
     assert!(heading.is_block());
     assert!(!heading.is_inline());
@@ -159,4 +169,75 @@ fn test_node_type_checking() {
     ]);
     assert!(paragraph.is_block());
     assert!(!paragraph.is_inline());
+}
+
+#[test]
+fn test_heading_constructor() {
+    // 测试新添加的 heading 构造方法
+    let heading = Node::heading(2, vec![Node::Text("标题".to_string())]);
+
+    // 验证结构
+    if let Node::Heading {
+        level,
+        content,
+        heading_type,
+    } = &heading
+    {
+        assert_eq!(*level, 2);
+        assert_eq!(content.len(), 1);
+        assert_eq!(content[0], Node::Text("标题".to_string()));
+        assert_eq!(*heading_type, HeadingType::Atx); // 默认应该是 Atx 类型
+    } else {
+        panic!("应该是 Heading 节点");
+    }
+
+    // 验证与手动构造的等价性
+    let manual_heading = Node::Heading {
+        level: 2,
+        content: vec![Node::Text("标题".to_string())],
+        heading_type: HeadingType::default(),
+    };
+
+    assert_eq!(heading, manual_heading);
+}
+
+#[test]
+fn test_code_block_constructor() {
+    // 测试带语言标识的代码块
+    let rust_code = Node::code_block(Some("rust".to_string()), "fn main() {}\n".to_string());
+
+    if let Node::CodeBlock {
+        language,
+        content,
+        block_type,
+    } = &rust_code
+    {
+        assert_eq!(*language, Some("rust".to_string()));
+        assert_eq!(*content, "fn main() {}\n".to_string());
+        assert!(matches!(
+            *block_type,
+            cmark_writer::ast::CodeBlockType::Fenced
+        ));
+    } else {
+        panic!("应该是 CodeBlock 节点");
+    }
+
+    // 测试不带语言标识的代码块
+    let plain_code = Node::code_block(None, "plain text".to_string());
+
+    if let Node::CodeBlock {
+        language,
+        content,
+        block_type,
+    } = &plain_code
+    {
+        assert_eq!(*language, None);
+        assert_eq!(*content, "plain text".to_string());
+        assert!(matches!(
+            *block_type,
+            cmark_writer::ast::CodeBlockType::Fenced
+        ));
+    } else {
+        panic!("应该是 CodeBlock 节点");
+    }
 }

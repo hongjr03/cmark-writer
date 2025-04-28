@@ -1,4 +1,4 @@
-use cmark_writer::ast::{ListItem, Node};
+use cmark_writer::ast::{CodeBlockType, HeadingType, ListItem, Node};
 use cmark_writer::writer::CommonMarkWriter;
 
 #[test]
@@ -8,6 +8,7 @@ fn test_simple_document() {
         Node::Heading {
             level: 1,
             content: vec![Node::Text("Title".to_string())],
+            heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![
             Node::Text("Regular text ".to_string()),
@@ -27,7 +28,7 @@ fn test_simple_document() {
     let result = writer.into_string();
 
     // Verify result, note that spacing handling is fixed
-    let expected = "# Title\n\nRegular text **bold text** regular text";
+    let expected = "# Title\n\nRegular text **bold text** regular text\n";
     assert_eq!(result, expected);
 }
 
@@ -38,6 +39,7 @@ fn test_complex_document() {
         Node::Heading {
             level: 2,
             content: vec![Node::Text("List Example".to_string())],
+            heading_type: HeadingType::Atx,
         },
         Node::UnorderedList(vec![
             ListItem::Unordered {
@@ -50,6 +52,7 @@ fn test_complex_document() {
         Node::CodeBlock {
             language: Some("rust".to_string()),
             content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+            block_type: CodeBlockType::Fenced,
         },
     ]);
 
@@ -61,6 +64,6 @@ fn test_complex_document() {
         .expect("Failed to write document");
     let result = writer.into_string();
 
-    let expected = "## List Example\n\n- Item 1\n- Item 2\n\n```rust\nfn main() {\n    println!(\"Hello\");\n}\n```";
+    let expected = "## List Example\n\n- Item 1\n- Item 2\n\n```rust\nfn main() {\n    println!(\"Hello\");\n}\n```\n";
     assert_eq!(result, expected);
 }

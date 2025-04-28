@@ -1,6 +1,7 @@
-use cmark_writer::ast::{Alignment, HtmlAttribute, HtmlElement, ListItem, Node};
+use cmark_writer::ast::{HeadingType, HtmlAttribute, HtmlElement, ListItem, Node};
 use cmark_writer::options::WriterOptions;
 use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::CodeBlockType;
 
 #[test]
 fn test_write_text() {
@@ -26,7 +27,7 @@ fn test_write_emphasis() {
     let mut writer = CommonMarkWriter::new();
     let emphasis = Node::Emphasis(vec![Node::Text("emphasized".to_string())]);
     writer.write(&emphasis).unwrap();
-    assert_eq!(writer.into_string(), "*emphasized*");
+    assert_eq!(writer.into_string(), "_emphasized_");
 }
 
 #[test]
@@ -43,11 +44,27 @@ fn test_write_code_block() {
     let code_block = Node::CodeBlock {
         language: Some("rust".to_string()),
         content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+        block_type: cmark_writer::ast::CodeBlockType::Fenced,
     };
     writer.write(&code_block).unwrap();
     assert_eq!(
         writer.into_string(),
-        "```rust\nfn main() {\n    println!(\"Hello\");\n}\n```"
+        "```rust\nfn main() {\n    println!(\"Hello\");\n}\n```\n"
+    );
+}
+
+#[test]
+fn test_write_indented_code_block() {
+    let mut writer = CommonMarkWriter::new();
+    let code_block = Node::CodeBlock {
+        language: None,
+        content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+        block_type: CodeBlockType::Indented,
+    };
+    writer.write(&code_block).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "    fn main() {\n        println!(\"Hello\");\n    }\n"
     );
 }
 
@@ -65,9 +82,10 @@ fn test_write_heading() {
     let heading = Node::Heading {
         level: 2,
         content: vec![Node::Text("Section Title".to_string())],
+        heading_type: HeadingType::Atx, // 添加默认的 ATX 标题类型
     };
     writer.write(&heading).unwrap();
-    assert_eq!(writer.into_string(), "## Section Title");
+    assert_eq!(writer.into_string(), "## Section Title\n");
 }
 
 #[test]
@@ -81,7 +99,7 @@ fn test_write_paragraph() {
     writer.write(&paragraph).unwrap();
     assert_eq!(
         writer.into_string(),
-        "This is a **paragraph** with formatting."
+        "This is a **paragraph** with formatting.\n"
     );
 }
 
@@ -97,7 +115,7 @@ fn test_write_unordered_list() {
         },
     ]);
     writer.write(&list).unwrap();
-    assert_eq!(writer.into_string(), "- Item 1\n- Item 2");
+    assert_eq!(writer.into_string(), "- Item 1\n- Item 2\n");
 }
 
 #[test]
@@ -144,7 +162,7 @@ fn test_write_image_with_formatted_alt() {
     writer.write(&image).unwrap();
     assert_eq!(
         writer.into_string(),
-        "![Image with **bold** and *italic* text](image.png \"An image with formatted alt text\")"
+        "![Image with **bold** and _italic_ text](image.png \"An image with formatted alt text\")"
     );
 }
 
@@ -182,11 +200,10 @@ fn test_write_table() {
             ],
             vec![Node::Text("Bob".to_string()), Node::Text("25".to_string())],
         ],
-        alignments: vec![Alignment::Left, Alignment::Right],
     };
 
     writer.write(&table).unwrap();
-    let expected = "| Name | Age |\n| :--- | ---: |\n| Alice | 30 |\n| Bob | 25 |\n";
+    let expected = "| Name | Age |\n| --- | --- |\n| Alice | 30 |\n| Bob | 25 |\n";
     assert_eq!(writer.into_string(), expected);
 }
 
@@ -256,10 +273,13 @@ fn test_write_mixed_nested_lists() {
     // preservation of indentation
     let expected = r#"- Level 1 item 1
 - Level 1 item 2
-    1. Level 2 ordered item 1
-    2. Level 2 ordered item 2
-        - Level 3 unordered item
-- Level 1 item 3"#;
+  
+  1. Level 2 ordered item 1
+  2. Level 2 ordered item 2
+     
+     - Level 3 unordered item
+- Level 1 item 3
+"#;
 
     assert_eq!(result, expected);
 }
@@ -289,7 +309,7 @@ fn test_inline_elements_line_breaks() {
     let result = writer.into_string();
 
     // All inline elements should be on the same line without incorrect line breaks
-    let expected = "This is **bold** and *emphasized* text with a [link](https://example.com \"Link title\") and `some code`.";
+    let expected = "This is **bold** and _emphasized_ text with a [link](https://example.com \"Link title\") and `some code`.\n";
     assert_eq!(result, expected);
 
     // Test inline elements in list items
@@ -322,7 +342,7 @@ fn test_inline_elements_line_breaks() {
 
     // Inline elements in list items should not have incorrect line breaks
     let expected =
-        "- Item with **bold** and *emphasis*\n- Item with `code` and a [link](https://example.com)";
+        "- Item with **bold** and _emphasis_\n- Item with `code` and a [link](https://example.com)\n";
     assert_eq!(result, expected);
 }
 
@@ -382,25 +402,24 @@ fn test_write_table_cell_with_newline_should_fail() {
     let table = Node::Table {
         headers: vec![Node::Text("header".to_string())],
         rows: vec![vec![Node::Text("foo\nbar".to_string())]],
-        alignments: vec![Alignment::Left],
     };
     assert!(writer.write(&table).is_err());
 }
 
-#[test]
-fn test_write_strike() {
-    let mut writer = CommonMarkWriter::new();
-    let strike = Node::Strike(vec![Node::Text("strikethrough".to_string())]);
-    writer.write(&strike).unwrap();
-    assert_eq!(writer.into_string(), "~~strikethrough~~");
-}
+// #[test]
+// fn test_write_strike() {
+//     let mut writer = CommonMarkWriter::new();
+//     let strike = Node::Emphasis(vec![Node::Text("emphasis".to_string())]);
+//     writer.write(&strike).unwrap();
+//     assert_eq!(writer.into_string(), "~~emphasis~~");
+// }
 
-#[test]
-fn test_write_strike_with_newline_should_fail() {
-    let mut writer = CommonMarkWriter::new();
-    let strike = Node::Strike(vec![Node::Text("foo\nbar".to_string())]);
-    assert!(writer.write(&strike).is_err());
-}
+// #[test]
+// fn test_write_strike_with_newline_should_fail() {
+//     let mut writer = CommonMarkWriter::new();
+//     let strike = Node::Emphasis(vec![Node::Text("foo\nbar".to_string())]);
+//     assert!(writer.write(&strike).is_err());
+// }
 
 #[test]
 fn test_write_mixed_formatting() {
@@ -411,14 +430,14 @@ fn test_write_mixed_formatting() {
         Node::Text(" and ".to_string()),
         Node::Emphasis(vec![Node::Text("emphasized".to_string())]),
         Node::Text(" and ".to_string()),
-        Node::Strike(vec![Node::Text("strikethrough".to_string())]),
+        Node::Emphasis(vec![Node::Text("emphasis".to_string())]),
         Node::Text(" text.".to_string()),
     ]);
 
     writer.write(&paragraph).unwrap();
     let result = writer.into_string();
 
-    let expected = "This is **bold** and *emphasized* and ~~strikethrough~~ text.";
+    let expected = "This is **bold** and _emphasized_ and _emphasis_ text.\n";
     assert_eq!(result, expected);
 }
 
@@ -427,8 +446,8 @@ fn test_write_nested_formatting_with_strike() {
     let mut writer = CommonMarkWriter::new();
     let paragraph = Node::Paragraph(vec![
         Node::Text("This contains ".to_string()),
-        Node::Strike(vec![
-            Node::Text("strikethrough with ".to_string()),
+        Node::Emphasis(vec![
+            Node::Text("emphasis with ".to_string()),
             Node::Strong(vec![Node::Text("bold".to_string())]),
             Node::Text(" inside".to_string()),
         ]),
@@ -438,7 +457,7 @@ fn test_write_nested_formatting_with_strike() {
     writer.write(&paragraph).unwrap();
     let result = writer.into_string();
 
-    let expected = "This contains ~~strikethrough with **bold** inside~~.";
+    let expected = "This contains _emphasis with **bold** inside_.\n";
     assert_eq!(result, expected);
 }
 
@@ -547,7 +566,7 @@ fn test_html_element_with_formatted_content() {
     writer.write(&element).unwrap();
     assert_eq!(
         writer.into_string(),
-        "<p class=\"text\">普通文本 **粗体文本** 和 *斜体文本*</p>"
+        "<p class=\"text\">普通文本 **粗体文本** 和 _斜体文本_</p>"
     );
 }
 
@@ -588,7 +607,7 @@ fn test_html_element_in_paragraph() {
     writer.write(&paragraph).unwrap();
     assert_eq!(
         writer.into_string(),
-        "文本开始 <code>代码片段</code> 文本结束"
+        "文本开始 <code>代码片段</code> 文本结束\n"
     );
 }
 
@@ -601,7 +620,7 @@ fn test_write_html_block() {
     writer.write(&html_block).unwrap();
     assert_eq!(
         writer.into_string(),
-        "<div class=\"container\">\n  <h1>标题</h1>\n  <p>段落</p>\n</div>"
+        "<div class=\"container\">\n  <h1>标题</h1>\n  <p>段落</p>\n</div>\n"
     );
 }
 
@@ -618,7 +637,7 @@ fn test_hard_break_with_chinese_text() {
     let result = writer.into_string();
 
     // Default: use backslash for line breaks
-    let expected = "换行测试：\\\n这行文字应该在上一行的下方紧跟着。";
+    let expected = "换行测试：\\\n这行文字应该在上一行的下方紧跟着。\n";
     assert_eq!(result, expected);
 
     // Test line break with spaces option
@@ -631,7 +650,7 @@ fn test_hard_break_with_chinese_text() {
     writer.write(&paragraph).unwrap();
     let result = writer.into_string();
 
-    let expected_spaces = "换行测试：  \n这行文字应该在上一行的下方紧跟着。";
+    let expected_spaces = "换行测试：  \n这行文字应该在上一行的下方紧跟着。\n";
     assert_eq!(result, expected_spaces);
 }
 
@@ -652,7 +671,7 @@ fn test_write_ordered_list() {
         ],
     };
     writer.write(&list).unwrap();
-    assert_eq!(writer.into_string(), "1. 第一项\n2. 第二项");
+    assert_eq!(writer.into_string(), "1. 第一项\n2. 第二项\n");
 }
 
 #[test]
@@ -680,7 +699,7 @@ fn test_write_ordered_list_with_custom_number() {
     writer.write(&list).unwrap();
     assert_eq!(
         writer.into_string(),
-        "1. 第一项\n5. 从 5 开始的项\n6. 自动递增项"
+        "1. 第一项\n5. 从 5 开始的项\n6. 自动递增项\n"
     );
 }
 
@@ -708,6 +727,339 @@ fn test_mixed_ordered_and_unordered_items() {
     writer.write(&list).unwrap();
     assert_eq!(
         writer.into_string(),
-        "10. 从 10 开始的项\n11. 无序列表项\n20. 跳跃到 20"
+        "10. 从 10 开始的项\n11. 无序列表项\n20. 跳跃到 20\n"
     );
+}
+
+#[test]
+fn test_write_uri_autolink() {
+    let mut writer = CommonMarkWriter::new();
+    let autolink = Node::Autolink {
+        url: "https://www.example.com".to_string(),
+        is_email: false,
+    };
+    writer.write(&autolink).unwrap();
+    assert_eq!(writer.into_string(), "<https://www.example.com>");
+}
+
+#[test]
+fn test_write_uri_autolink_without_scheme() {
+    let mut writer = CommonMarkWriter::new();
+    let autolink = Node::Autolink {
+        url: "www.example.com".to_string(),
+        is_email: false,
+    };
+    writer.write(&autolink).unwrap();
+    assert_eq!(writer.into_string(), "<https://www.example.com>");
+}
+
+#[test]
+fn test_write_email_autolink() {
+    let mut writer = CommonMarkWriter::new();
+    let autolink = Node::Autolink {
+        url: "user@example.com".to_string(),
+        is_email: true,
+    };
+    writer.write(&autolink).unwrap();
+    assert_eq!(writer.into_string(), "<user@example.com>");
+}
+
+#[test]
+fn test_autolink_with_newline_should_fail() {
+    let mut writer = CommonMarkWriter::new();
+    let autolink = Node::Autolink {
+        url: "https://example.com\nwith-newline".to_string(),
+        is_email: false,
+    };
+    assert!(writer.write(&autolink).is_err());
+}
+
+#[test]
+fn test_autolink_in_paragraph() {
+    let mut writer = CommonMarkWriter::new();
+    let paragraph = Node::Paragraph(vec![
+        Node::Text("Visit ".to_string()),
+        Node::Autolink {
+            url: "https://www.example.com".to_string(),
+            is_email: false,
+        },
+        Node::Text(" or contact ".to_string()),
+        Node::Autolink {
+            url: "user@example.com".to_string(),
+            is_email: true,
+        },
+        Node::Text(" for more information.".to_string()),
+    ]);
+
+    writer.write(&paragraph).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "Visit <https://www.example.com> or contact <user@example.com> for more information.\n"
+    );
+}
+
+#[test]
+fn test_write_link_reference_definition() {
+    let mut writer = CommonMarkWriter::new();
+    let link_ref_def = Node::LinkReferenceDefinition {
+        label: "foo".to_string(),
+        destination: "/url".to_string(),
+        title: Some("title".to_string()),
+    };
+    writer.write(&link_ref_def).unwrap();
+    assert_eq!(writer.into_string(), "[foo]: /url \"title\"\n");
+}
+
+#[test]
+fn test_write_link_reference_definition_no_title() {
+    let mut writer = CommonMarkWriter::new();
+    let link_ref_def = Node::LinkReferenceDefinition {
+        label: "bar".to_string(),
+        destination: "https://example.com".to_string(),
+        title: None,
+    };
+    writer.write(&link_ref_def).unwrap();
+    assert_eq!(writer.into_string(), "[bar]: https://example.com\n");
+}
+
+#[test]
+fn test_write_reference_link() {
+    let mut writer = CommonMarkWriter::new();
+    let ref_link = Node::ReferenceLink {
+        label: "foo".to_string(),
+        content: vec![Node::Text("Link text".to_string())],
+    };
+    writer.write(&ref_link).unwrap();
+    assert_eq!(writer.into_string(), "[Link text][foo]");
+}
+
+#[test]
+fn test_write_shortcut_reference_link() {
+    let mut writer = CommonMarkWriter::new();
+    // When content is the same as label, it's a shortcut reference
+    let ref_link = Node::ReferenceLink {
+        label: "foo".to_string(),
+        content: vec![Node::Text("foo".to_string())],
+    };
+    writer.write(&ref_link).unwrap();
+    assert_eq!(writer.into_string(), "[foo]");
+
+    // Empty content also produces a shortcut reference
+    let mut writer = CommonMarkWriter::new();
+    let ref_link = Node::ReferenceLink {
+        label: "bar".to_string(),
+        content: vec![],
+    };
+    writer.write(&ref_link).unwrap();
+    assert_eq!(writer.into_string(), "[bar]");
+}
+
+#[test]
+fn test_reference_link_in_paragraph() {
+    let mut writer = CommonMarkWriter::new();
+    let paragraph = Node::Paragraph(vec![
+        Node::Text("See ".to_string()),
+        Node::ReferenceLink {
+            label: "example".to_string(),
+            content: vec![Node::Text("this example".to_string())],
+        },
+        Node::Text(" for more information.".to_string()),
+    ]);
+
+    writer.write(&paragraph).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "See [this example][example] for more information.\n"
+    );
+}
+
+#[test]
+fn test_document_with_reference_links() {
+    let mut writer = CommonMarkWriter::new();
+    let doc = Node::Document(vec![
+        Node::LinkReferenceDefinition {
+            label: "example".to_string(),
+            destination: "/example".to_string(),
+            title: Some("Example Page".to_string()),
+        },
+        Node::Paragraph(vec![
+            Node::Text("See ".to_string()),
+            Node::ReferenceLink {
+                label: "example".to_string(),
+                content: vec![Node::Text("this example".to_string())],
+            },
+            Node::Text(".".to_string()),
+        ]),
+        Node::Paragraph(vec![
+            Node::Text("Or just click ".to_string()),
+            Node::ReferenceLink {
+                label: "example".to_string(),
+                content: vec![Node::Text("example".to_string())],
+            },
+            Node::Text(".".to_string()),
+        ]),
+    ]);
+
+    writer.write(&doc).unwrap();
+    assert_eq!(
+        writer.into_string(),
+        "[example]: /example \"Example Page\"
+
+See [this example][example].
+
+Or just click [example].
+"
+    );
+}
+
+#[test]
+fn test_nested_leaf_blocks_with_indentation() {
+    let mut writer = CommonMarkWriter::new();
+
+    let list = Node::UnorderedList(vec![
+        ListItem::Unordered {
+            content: vec![Node::Paragraph(vec![Node::Text("普通段落".to_string())])],
+        },
+        ListItem::Unordered {
+            content: vec![Node::Heading {
+                level: 3,
+                content: vec![Node::Text("列表中的标题".to_string())],
+                heading_type: HeadingType::Atx, // 添加默认的 ATX 标题类型
+            }],
+        },
+        ListItem::Unordered {
+            content: vec![Node::CodeBlock {
+                language: None,
+                content: "function test() {\n  console.log('Hello');\n}".to_string(),
+                block_type: cmark_writer::ast::CodeBlockType::Indented,
+            }],
+        },
+        ListItem::Unordered {
+            content: vec![Node::CodeBlock {
+                language: Some("rust".to_string()),
+                content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+                block_type: cmark_writer::ast::CodeBlockType::Fenced,
+            }],
+        },
+        ListItem::Unordered {
+            content: vec![Node::ThematicBreak],
+        },
+        ListItem::Unordered {
+            content: vec![Node::HtmlBlock(
+                "<div>\n  <p>HTML 内容</p>\n</div>".to_string(),
+            )],
+        },
+        ListItem::Unordered {
+            content: vec![Node::LinkReferenceDefinition {
+                label: "link".to_string(),
+                destination: "https://example.com".to_string(),
+                title: Some("示例链接".to_string()),
+            }],
+        },
+    ]);
+
+    writer.write(&list).unwrap();
+    let result = writer.into_string();
+
+    let expected = r#"- 普通段落
+- ### 列表中的标题
+-     function test() {
+        console.log('Hello');
+      }
+- ```rust
+  fn main() {
+      println!("Hello");
+  }
+  ```
+- ---
+- <div>
+    <p>HTML 内容</p>
+  </div>
+- [link]: https://example.com "示例链接"
+"#;
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_nested_blockquote_with_indentation() {
+    let mut writer = CommonMarkWriter::new();
+
+    let blockquote = Node::BlockQuote(vec![
+        Node::Paragraph(vec![Node::Text("外部引用第一段落".to_string())]),
+        Node::BlockQuote(vec![
+            Node::Paragraph(vec![Node::Text("内部引用段落".to_string())]),
+            Node::CodeBlock {
+                language: Some("js".to_string()),
+                content: "function nested() {\n  console.log('嵌套代码');\n}".to_string(),
+                block_type: cmark_writer::ast::CodeBlockType::Fenced,
+            },
+        ]),
+        Node::Paragraph(vec![Node::Text("外部引用第二段落".to_string())]),
+    ]);
+
+    writer.write(&blockquote).unwrap();
+    let result = writer.into_string();
+
+    let expected = "> 外部引用第一段落
+> 
+> > 内部引用段落
+> > 
+> > ```js
+> > function nested() {
+> >   console.log('嵌套代码');
+> > }
+> > ```
+> 
+> 外部引用第二段落
+";
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_nested_mixed_containers() {
+    let mut writer = CommonMarkWriter::new();
+
+    let mixed_containers = Node::BlockQuote(vec![
+        Node::Paragraph(vec![Node::Text("引用块中的段落".to_string())]),
+        Node::UnorderedList(vec![
+            ListItem::Unordered {
+                content: vec![
+                    Node::Paragraph(vec![Node::Text("列表项 1".to_string())]),
+                    Node::BlockQuote(vec![Node::Paragraph(vec![Node::Text(
+                        "列表项中的引用块".to_string(),
+                    )])]),
+                ],
+            },
+            ListItem::Unordered {
+                content: vec![
+                    Node::Paragraph(vec![Node::Text("列表项 2".to_string())]),
+                    Node::CodeBlock {
+                        language: None,
+                        content: "code in list item".to_string(),
+                        block_type: CodeBlockType::Indented,
+                    },
+                ],
+            },
+        ]),
+        Node::Paragraph(vec![Node::Text("引用块的最后一段".to_string())]),
+    ]);
+
+    writer.write(&mixed_containers).unwrap();
+    let result = writer.into_string();
+
+    let expected = "> 引用块中的段落
+> 
+> - 列表项 1
+>   
+>   > 列表项中的引用块
+> - 列表项 2
+>   
+>       code in list item
+> 
+> 引用块的最后一段
+";
+
+    assert_eq!(result, expected);
 }

@@ -1,6 +1,9 @@
-use cmark_writer::ast::Node;
-use cmark_writer::error::{WriteError, WriteResult};
-use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::ast::HeadingType;
+use cmark_writer::define_custom_errors;
+use cmark_writer::CommonMarkWriter;
+use cmark_writer::Node;
+use cmark_writer::WriteError;
+use cmark_writer::WriteResult;
 use std::fmt::{self, Display};
 
 #[test]
@@ -11,6 +14,7 @@ fn test_invalid_heading_level() {
     let invalid_heading_0 = Node::Heading {
         level: 0,
         content: vec![Node::Text("Invalid Heading".to_string())],
+        heading_type: HeadingType::Atx,
     };
     let result = writer.write(&invalid_heading_0);
     assert!(result.is_err());
@@ -26,6 +30,7 @@ fn test_invalid_heading_level() {
     let invalid_heading_7 = Node::Heading {
         level: 7,
         content: vec![Node::Text("Invalid Heading".to_string())],
+        heading_type: HeadingType::Atx,
     };
     let result = writer.write(&invalid_heading_7);
     assert!(result.is_err());
@@ -41,6 +46,7 @@ fn test_invalid_heading_level() {
     let valid_heading = Node::Heading {
         level: 6,
         content: vec![Node::Text("Valid Heading".to_string())],
+        heading_type: HeadingType::Atx,
     };
     assert!(writer.write(&valid_heading).is_ok());
 }
@@ -160,4 +166,108 @@ fn test_write_result_alias() {
 
     let err_result: WriteResult<()> = Err(WriteError::UnsupportedNodeType);
     assert!(err_result.is_err());
+}
+
+#[test]
+fn test_custom_errors() {
+    use cmark_writer::error::WriteError;
+    use std::error::Error;
+
+    let custom_err = WriteError::custom("这是一个自定义错误");
+    assert_eq!(custom_err.to_string(), "Custom error: 这是一个自定义错误");
+
+    let coded_err =
+        WriteError::custom_with_code("表格行单元格数与表头数不匹配", "TABLE_STRUCTURE_ERROR");
+    assert_eq!(
+        coded_err.to_string(),
+        "Custom error [TABLE_STRUCTURE_ERROR]: 表格行单元格数与表头数不匹配"
+    );
+
+    let structure_err = WriteError::InvalidStructure("表格结构无效".to_string());
+    assert_eq!(structure_err.to_string(), "Invalid structure: 表格结构无效");
+
+    fn takes_error(_: &dyn Error) {}
+    takes_error(&custom_err);
+    takes_error(&coded_err);
+    takes_error(&structure_err);
+}
+
+#[test]
+fn test_custom_error_macro() {
+    use cmark_writer::define_custom_errors;
+    use cmark_writer::error::WriteError;
+    use cmark_writer::CustomErrorFactory;
+
+    define_custom_errors! {
+        struct TableColumnMismatchError(message: &str) with format = "表格列数不匹配：{}";
+
+        struct TableEmptyHeaderError(message: &str) with format = "表格空表头：{}";
+        struct DocumentFormatError(message: &str) with format = "文档格式错误：{}";
+
+        coded MarkdownSyntaxError(message: &str, code: &str);
+
+    }
+
+    let err1 = TableColumnMismatchError::new("第 3 行有 4 列，但表头只有 3 列").into_error();
+    assert_eq!(
+        err1.to_string(),
+        "Invalid structure: 表格列数不匹配：第 3 行有 4 列，但表头只有 3 列"
+    );
+
+    let err2 = TableEmptyHeaderError::new("表格必须包含至少一个表头").into_error();
+    assert_eq!(
+        err2.to_string(),
+        "Invalid structure: 表格空表头：表格必须包含至少一个表头"
+    );
+
+    let err3 = MarkdownSyntaxError::new("缺少闭合代码块标记", "CODE_BLOCK_UNCLOSED").into_error();
+    assert_eq!(
+        err3.to_string(),
+        "Custom error [CODE_BLOCK_UNCLOSED]: 缺少闭合代码块标记"
+    );
+
+    let err4 = DocumentFormatError::new("文档超过最大嵌套深度").into_error();
+    assert_eq!(
+        err4.to_string(),
+        "Invalid structure: 文档格式错误：文档超过最大嵌套深度"
+    );
+
+    let err5: WriteError = TableColumnMismatchError::new("错误示例").into();
+    assert!(matches!(err5, WriteError::InvalidStructure(_)));
+}
+
+#[test]
+fn test_mixed_order_custom_errors() {
+    use cmark_writer::define_custom_errors;
+
+    use cmark_writer::CustomErrorFactory;
+
+    define_custom_errors! {
+
+        coded ValidationError(message: &str, code: &str);
+        struct ParseError(message: &str) with format = "解析错误：{}";
+        coded FormatError(message: &str, code: &str);
+        struct RenderError(message: &str) with format = "渲染错误：{}";
+    }
+
+    let err1 = ValidationError::new("数据验证失败", "DATA_VALIDATION_FAILED").into_error();
+    assert_eq!(
+        err1.to_string(),
+        "Custom error [DATA_VALIDATION_FAILED]: 数据验证失败"
+    );
+
+    let err2 = ParseError::new("无法解析 Markdown").into_error();
+    assert_eq!(
+        err2.to_string(),
+        "Invalid structure: 解析错误：无法解析 Markdown"
+    );
+
+    let err3 = FormatError::new("格式化失败", "FORMAT_FAILED").into_error();
+    assert_eq!(err3.to_string(), "Custom error [FORMAT_FAILED]: 格式化失败");
+
+    let err4 = RenderError::new("无法渲染表格").into_error();
+    assert_eq!(
+        err4.to_string(),
+        "Invalid structure: 渲染错误：无法渲染表格"
+    );
 }

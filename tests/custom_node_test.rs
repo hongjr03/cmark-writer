@@ -1,6 +1,22 @@
-use cmark_writer::ast::{CustomNodeWriter, Node};
-use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::ast::HeadingType;
+use cmark_writer::define_custom_errors;
+use cmark_writer::derive_custom_node;
+use cmark_writer::CodeBlockType;
+use cmark_writer::CommonMarkWriter;
+use cmark_writer::CustomErrorFactory;
 use cmark_writer::WriteResult;
+use cmark_writer::{CustomNodeWriter, Node};
+
+define_custom_errors! {
+
+    struct TableRowColumnMismatchError(message: &str) with format = "表格行列不匹配：{}";
+
+
+    struct TableEmptyHeaderError(message: &str) with format = "表格空表头：{}";
+
+
+    coded TableAlignmentError(message: &str, code: &str);
+}
 
 // A simple custom node example: representing highlighted text
 #[derive(Debug, PartialEq, Clone)]
@@ -10,14 +26,11 @@ struct HighlightNode {
 }
 
 // Using macro to implement CustomNode trait
-cmark_writer::derive_custom_node!(HighlightNode);
+derive_custom_node!(HighlightNode);
 
 // Implementing required methods for HighlightNode
 impl HighlightNode {
-    fn write_custom(
-        &self,
-        writer: &mut dyn CustomNodeWriter,
-    ) -> cmark_writer::error::WriteResult<()> {
+    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
         // Implement custom writing logic
         writer.write_str("<span style=\"background-color: ")?;
         writer.write_str(&self.color)?;
@@ -41,14 +54,11 @@ struct CalloutNode {
 }
 
 // Using macro to implement CustomNode trait
-cmark_writer::derive_custom_node!(CalloutNode);
+derive_custom_node!(CalloutNode);
 
 // Implementing required methods for CalloutNode
 impl CalloutNode {
-    fn write_custom(
-        &self,
-        writer: &mut dyn CustomNodeWriter,
-    ) -> cmark_writer::error::WriteResult<()> {
+    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
         writer.write_str("<div class=\"callout callout-")?;
         writer.write_str(&self.style)?;
         writer.write_str("\">\n")?;
@@ -95,7 +105,7 @@ fn test_callout_block() {
     }));
 
     writer.write(&callout).unwrap();
-    let expected = "<div class=\"callout callout-warning\">\n  <h4>Important note</h4>\n  <p>This is an important message.</p>\n</div>";
+    let expected = "<div class=\"callout callout-warning\">\n  <h4>Important note</h4>\n  <p>This is an important message.</p>\n</div>\n";
     assert_eq!(writer.into_string(), expected);
 }
 
@@ -114,7 +124,7 @@ fn test_custom_node_in_paragraph() {
     writer.write(&paragraph).unwrap();
     assert_eq!(
         writer.into_string(),
-        "This is regular text with <span style=\"background-color: yellow\">highlighted text</span> mixed together."
+        "This is regular text with <span style=\"background-color: yellow\">highlighted text</span> mixed together.\n"
     );
 }
 
@@ -125,6 +135,7 @@ fn test_custom_block_in_document() {
         Node::Heading {
             level: 1,
             content: vec![Node::Text("Document Title".to_string())],
+            heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![Node::Text("This is a paragraph.".to_string())]),
         Node::Custom(Box::new(CalloutNode {
@@ -136,7 +147,7 @@ fn test_custom_block_in_document() {
     ]);
 
     writer.write(&document).unwrap();
-    let expected = "# Document Title\n\nThis is a paragraph.\n\n<div class=\"callout callout-info\">\n  <h4>Important Information</h4>\n  <p>Please pay attention to this content.</p>\n</div>\n\nAnother paragraph.";
+    let expected = "# Document Title\n\nThis is a paragraph.\n\n<div class=\"callout callout-info\">\n  <h4>Important Information</h4>\n  <p>Please pay attention to this content.</p>\n</div>\n\nAnother paragraph.\n";
     assert_eq!(writer.into_string(), expected);
 }
 
@@ -154,7 +165,7 @@ struct FigureNode {
 }
 
 // Using macro to implement CustomNode trait
-cmark_writer::derive_custom_node!(FigureNode);
+derive_custom_node!(FigureNode);
 
 impl FigureNode {
     // Helper method to write a node to the provided writer
@@ -238,7 +249,7 @@ fn test_figure_with_image() {
 
     writer.write(&figure).unwrap();
 
-    let expected = "<figure id=\"fig1\">\n![A sample image](sample.jpg \"Sample image\")\n  <figcaption>Figure 1: Sample illustration</figcaption>\n</figure>";
+    let expected = "<figure id=\"fig1\">\n![A sample image](sample.jpg \"Sample image\")\n  <figcaption>Figure 1: Sample illustration</figcaption>\n</figure>\n";
     assert_eq!(writer.into_string(), expected);
 }
 
@@ -251,6 +262,7 @@ fn test_figure_with_code_block() {
         body: Box::new(Node::CodeBlock {
             language: Some("rust".to_string()),
             content: "fn main() {\n    println!(\"Hello, world!\");\n}".to_string(),
+            block_type: CodeBlockType::Fenced,
         }),
         caption: "Figure 2: Rust Hello World example".to_string(),
         id: None,
@@ -258,7 +270,7 @@ fn test_figure_with_code_block() {
 
     writer.write(&figure).unwrap();
 
-    let expected = "<figure>\n```rust\nfn main() {\n    println!(\"Hello, world!\");\n}\n```\n  <figcaption>Figure 2: Rust Hello World example</figcaption>\n</figure>";
+    let expected = "<figure>\n```rust\nfn main() {\n    println!(\"Hello, world!\");\n}\n```\n\n  <figcaption>Figure 2: Rust Hello World example</figcaption>\n</figure>\n";
     assert_eq!(writer.into_string(), expected);
 }
 
@@ -266,8 +278,8 @@ fn test_figure_with_code_block() {
 fn test_figure_with_table() {
     let mut writer = CommonMarkWriter::new();
 
-    // Create a figure containing a table
-    use cmark_writer::ast::Alignment;
+    // // Create a figure containing a table
+    // use cmark_writer::ast::Alignment;
 
     let figure = Node::Custom(Box::new(FigureNode {
         body: Box::new(Node::Table {
@@ -285,7 +297,7 @@ fn test_figure_with_table() {
                     Node::Text("200".to_string()),
                 ],
             ],
-            alignments: vec![Alignment::Left, Alignment::Right],
+            // alignments: vec![Alignment::Left, Alignment::Right],
         }),
         caption: "Figure 3: Sample data table".to_string(),
         id: Some("data-table".to_string()),
@@ -293,7 +305,7 @@ fn test_figure_with_table() {
 
     writer.write(&figure).unwrap();
 
-    let expected = "<figure id=\"data-table\">\n| Name | Value |\n| :--- | ---: |\n| Item 1 | 100 |\n| Item 2 | 200 |\n\n  <figcaption>Figure 3: Sample data table</figcaption>\n</figure>";
+    let expected = "<figure id=\"data-table\">\n| Name | Value |\n| --- | --- |\n| Item 1 | 100 |\n| Item 2 | 200 |\n\n  <figcaption>Figure 3: Sample data table</figcaption>\n</figure>\n";
     assert_eq!(writer.into_string(), expected);
 }
 
@@ -306,6 +318,7 @@ fn test_figure_in_document() {
         Node::Heading {
             level: 1,
             content: vec![Node::Text("Document with Figures".to_string())],
+            heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![Node::Text(
             "This document demonstrates using figures.".to_string(),
@@ -325,20 +338,16 @@ fn test_figure_in_document() {
     let expected = String::from("# Document with Figures\n\n")
         + "This document demonstrates using figures.\n\n"
         + "<figure id=\"quote-fig\">\n"
-        + "> This is a quote inside a figure.\n"
+        + "> This is a quote inside a figure.\n\n"
         + "  <figcaption>Figure 1: An important quote</figcaption>\n"
         + "</figure>\n\n"
-        + "Text after the figure.";
+        + "Text after the figure.\n";
 
     assert_eq!(writer.into_string(), expected);
 }
 
 #[test]
 fn test_derive_custom_node_macro() {
-    use cmark_writer::ast::{CustomNodeWriter, Node};
-    use cmark_writer::error::WriteResult;
-    use cmark_writer::writer::CommonMarkWriter;
-
     // A simple alert box custom node using the macro
     #[derive(Debug, Clone, PartialEq)]
     struct AlertBox {
@@ -347,7 +356,7 @@ fn test_derive_custom_node_macro() {
     }
 
     // Use the macro to implement CustomNode trait
-    cmark_writer::derive_custom_node!(AlertBox);
+    derive_custom_node!(AlertBox);
 
     // Implement the required methods for AlertBox
     impl AlertBox {
@@ -378,7 +387,7 @@ fn test_derive_custom_node_macro() {
     writer.write(&alert).unwrap();
 
     let expected =
-        "<div class=\"alert alert-warning\">\n  <p>This is an important alert message.</p>\n</div>";
+        "<div class=\"alert alert-warning\">\n  <p>This is an important alert message.</p>\n</div>\n";
     assert_eq!(writer.into_string(), expected);
 
     // Test using the custom node in a document
@@ -386,6 +395,7 @@ fn test_derive_custom_node_macro() {
         Node::Heading {
             level: 1,
             content: vec![Node::Text("Document with Alert".to_string())],
+            heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![Node::Text("Text before alert.".to_string())]),
         Node::Custom(Box::new(AlertBox {
@@ -398,6 +408,186 @@ fn test_derive_custom_node_macro() {
     let mut writer = CommonMarkWriter::new();
     writer.write(&document).unwrap();
 
-    let expected = "# Document with Alert\n\nText before alert.\n\n<div class=\"alert alert-warning\">\n  <p>This is an important alert message.</p>\n</div>\n\nText after alert.";
+    let expected = "# Document with Alert\n\nText before alert.\n\n<div class=\"alert alert-warning\">\n  <p>This is an important alert message.</p>\n</div>\n\nText after alert.\n";
+    assert_eq!(writer.into_string(), expected);
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum Alignment {
+    Left,
+    Center,
+    Right,
+    Default,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+struct AlignedTableNode {
+    headers: Vec<Node>,
+    rows: Vec<Vec<Node>>,
+    alignments: Vec<Alignment>,
+}
+
+derive_custom_node!(AlignedTableNode);
+
+impl AlignedTableNode {
+    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        if self.rows.iter().any(|row| row.len() != self.headers.len()) {
+            return Err(
+                TableRowColumnMismatchError::new("表格行单元格数与表头数不匹配").into_error(),
+            );
+        }
+
+        if self.headers.is_empty() {
+            return Err(TableEmptyHeaderError::new("表格必须至少有一个表头").into_error());
+        }
+
+        let alignments = if self.alignments.len() < self.headers.len() {
+            let mut extended = self.alignments.clone();
+            while extended.len() < self.headers.len() {
+                extended.push(Alignment::Default);
+            }
+            extended
+        } else {
+            self.alignments.clone()
+        };
+
+        writer.write_str("| ")?;
+        for (i, header) in self.headers.iter().enumerate() {
+            let mut cell_writer = CommonMarkWriter::new();
+            cell_writer.write(header)?;
+            let content = cell_writer.into_string();
+
+            writer.write_str(&content)?;
+
+            if i < self.headers.len() - 1 {
+                writer.write_str(" | ")?;
+            }
+        }
+        writer.write_str(" |\n")?;
+
+        writer.write_str("| ")?;
+        for (i, align) in alignments.iter().enumerate() {
+            match align {
+                Alignment::Left => writer.write_str(":---")?,
+                Alignment::Center => writer.write_str(":---:")?,
+                Alignment::Right => writer.write_str("---:")?,
+                Alignment::Default => writer.write_str("---")?,
+            }
+
+            if i < alignments.len() - 1 {
+                writer.write_str(" | ")?;
+            }
+        }
+        writer.write_str(" |\n")?;
+
+        for row in &self.rows {
+            writer.write_str("| ")?;
+            for (i, cell) in row.iter().enumerate() {
+                let mut cell_writer = CommonMarkWriter::new();
+                cell_writer.write(cell)?;
+                let content = cell_writer.into_string();
+
+                writer.write_str(&content)?;
+
+                if i < row.len() - 1 {
+                    writer.write_str(" | ")?;
+                }
+            }
+            writer.write_str(" |\n")?;
+        }
+
+        Ok(())
+    }
+
+    fn is_block_custom(&self) -> bool {
+        true
+    }
+}
+
+#[test]
+fn test_aligned_table() {
+    let mut writer = CommonMarkWriter::new();
+
+    let table = Node::Custom(Box::new(AlignedTableNode {
+        headers: vec![
+            Node::Text("名称".to_string()),
+            Node::Text("描述".to_string()),
+            Node::Text("数量".to_string()),
+            Node::Text("价格".to_string()),
+        ],
+        rows: vec![
+            vec![
+                Node::Text("商品 A".to_string()),
+                Node::Text("高质量产品".to_string()),
+                Node::Text("10".to_string()),
+                Node::Text("$100.00".to_string()),
+            ],
+            vec![
+                Node::Text("商品 B".to_string()),
+                Node::Text("性价比之选".to_string()),
+                Node::Text("20".to_string()),
+                Node::Text("$50.00".to_string()),
+            ],
+            vec![
+                Node::Text("商品 C".to_string()),
+                Node::Text("入门级产品".to_string()),
+                Node::Text("30".to_string()),
+                Node::Text("$25.00".to_string()),
+            ],
+        ],
+        alignments: vec![
+            Alignment::Left,
+            Alignment::Default,
+            Alignment::Center,
+            Alignment::Right,
+        ],
+    }));
+
+    writer.write(&table).unwrap();
+
+    let expected = "| 名称 | 描述 | 数量 | 价格 |\n| :--- | --- | :---: | ---: |\n| 商品 A | 高质量产品 | 10 | $100.00 |\n| 商品 B | 性价比之选 | 20 | $50.00 |\n| 商品 C | 入门级产品 | 30 | $25.00 |\n";
+    assert_eq!(writer.into_string(), expected);
+}
+
+#[test]
+fn test_aligned_table_in_figure() {
+    let mut writer = CommonMarkWriter::new();
+
+    let figure = Node::Custom(Box::new(FigureNode {
+        body: Box::new(Node::Custom(Box::new(AlignedTableNode {
+            headers: vec![
+                Node::Text("产品".to_string()),
+                Node::Text("Q1".to_string()),
+                Node::Text("Q2".to_string()),
+                Node::Text("同比增长".to_string()),
+            ],
+            rows: vec![
+                vec![
+                    Node::Text("手机".to_string()),
+                    Node::Text("1200".to_string()),
+                    Node::Text("1500".to_string()),
+                    Node::Text("25%".to_string()),
+                ],
+                vec![
+                    Node::Text("平板".to_string()),
+                    Node::Text("450".to_string()),
+                    Node::Text("480".to_string()),
+                    Node::Text("7%".to_string()),
+                ],
+            ],
+            alignments: vec![
+                Alignment::Left,
+                Alignment::Right,
+                Alignment::Right,
+                Alignment::Center,
+            ],
+        }))),
+        caption: "图表 1:2025 年上半年销售数据".to_string(),
+        id: Some("sales-data".to_string()),
+    }));
+
+    writer.write(&figure).unwrap();
+
+    let expected = "<figure id=\"sales-data\">\n| 产品 | Q1 | Q2 | 同比增长 |\n| :--- | ---: | ---: | :---: |\n| 手机 | 1200 | 1500 | 25% |\n| 平板 | 450 | 480 | 7% |\n\n  <figcaption>图表 1:2025 年上半年销售数据</figcaption>\n</figure>\n";
     assert_eq!(writer.into_string(), expected);
 }
