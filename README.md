@@ -70,17 +70,15 @@ You can extend the CommonMark syntax with your own custom nodes:
 ```rust
 use cmark_writer::ast::{CustomNodeWriter, Node};
 use cmark_writer::error::WriteResult;
-use cmark_writer::derive_custom_node;
+use cmark_writer::custom_node;
 
 // Define a custom highlight node
 #[derive(Debug, Clone, PartialEq)]
+#[custom_node]
 struct HighlightNode {
     content: String,
     color: String,
 }
-
-// Implement the custom node using the macro
-derive_custom_node!(HighlightNode);
 
 // Implement the required methods
 impl HighlightNode {
@@ -111,6 +109,33 @@ let document = Node::Document(vec![
         Node::Text(".".to_string()),
     ]),
 ]);
+```
+
+### Creating Custom Errors
+
+You can also define custom error types for your validation logic:
+
+```rust
+use cmark_writer::custom_error;
+use cmark_writer::coded_error;
+use cmark_writer::WriteError;
+
+// Define a structure error with format string
+#[custom_error(format = "Table structure error: {}")]
+struct TableStructureError(pub &'static str);
+
+// Define a coded error with error code
+#[coded_error]
+struct ValidationError(pub String, pub String);
+
+// Use in your code
+fn validate_table() -> Result<(), WriteError> {
+    // Using a structure error
+    return Err(TableStructureError("Rows don't match").into());
+    
+    // Using a coded error
+    // return Err(ValidationError("Invalid alignment".to_string(), "INVALID_ALIGNMENT".to_string()).into());
+}
 ```
 
 ## Development
