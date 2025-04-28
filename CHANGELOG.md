@@ -2,6 +2,31 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.6.0] - 2025-04-28
+
+### Features
+
+- Added CodeBlockType and HeadingType enums for better type safety
+- Exported CodeBlockType and HeadingType in public API
+- Added `Node::heading` and `Node::code_block` methods to create nodes with default styles
+- Improved WriteError with custom error handling and structure error support
+- Implemented procedural macros for all CommonMark nodes
+- Added custom error macro for simplified error handling
+- Added LinkReferenceDefinition, ReferenceLink and Autolink nodes
+- Implemented full CommonMark specification compliance
+- Removed non-standard CommonMark elements
+
+### Documentation
+
+- Updated README to include examples of new custom macros
+- Improved documentation with more idiomatic heading function examples
+
+### Changes
+
+- Refactored codebase to use procedural macros instead of manual structure construction
+- Updated dependencies in Cargo files
+- Updated project version to 0.6.0
+
 ## [0.5.0] - 2025-04-27
 
 ### Features
