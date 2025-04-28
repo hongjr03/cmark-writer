@@ -9,6 +9,4 @@ mod node;
 
 pub use self::custom::{CustomNode, CustomNodeWriter};
 pub use self::html::{HtmlAttribute, HtmlElement};
-pub use self::node::{Alignment, ListItem, Node};
-
-pub use crate::derive_custom_node;
+pub use self::node::{CodeBlockType, HeadingType, ListItem, Node};
