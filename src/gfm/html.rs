@@ -3,7 +3,7 @@
 //! This module provides utilities for handling HTML in GitHub Flavored Markdown,
 //! including filtering of potentially unsafe HTML tags according to GFM specifications.
 
-use crate::ast::{html::safe_html, HtmlElement, Node};
+use crate::ast::{safe_html, HtmlElement, Node};
 
 /// Default list of HTML tags disallowed in GitHub Flavored Markdown
 ///
