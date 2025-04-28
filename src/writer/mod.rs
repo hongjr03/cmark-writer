@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality to convert AST nodes to CommonMark format text.
 
-mod common_mark;
+mod cmark;
 mod processors;
 
-pub use self::common_mark::CommonMarkWriter;
+pub use self::cmark::CommonMarkWriter;
