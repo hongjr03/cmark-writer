@@ -2,6 +2,31 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.6.1] - 2025-04-28
+
+### Features
+
+- Added GitHub Flavored Markdown (GFM) support with strikethrough, task lists, and tables
+
+### Bug Fixes
+
+- Corrected import path for safe_html in GFM HTML handling
+- Removed default attribute from Node enum and implemented Default manually
+
+### Documentation
+
+- Removed ListItem description from Core Types section in README
+
+### Changes
+
+- Refactored error handling into a single file
+- Updated version to 0.6.1 in Cargo.toml and Cargo.lock
+
+### CI
+
+- Enhanced CI workflow with multi-Rust version support and additional linting steps
+- Added Codecov token and enabled failure on coverage errors
+
 ## [0.6.0] - 2025-04-28
 
 ### Features
