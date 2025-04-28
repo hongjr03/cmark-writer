@@ -2,10 +2,13 @@
 //!
 //! This file contains the implementation of the CommonMarkWriter class, which serializes AST nodes to CommonMark-compliant text.
 
-use crate::ast::{CustomNode, CustomNodeWriter, HeadingType, HtmlElement, ListItem, Node};
+#[cfg(feature = "gfm")]
+use crate::ast::TableAlignment;
+use crate::ast::{
+    CodeBlockType, CustomNode, CustomNodeWriter, HeadingType, HtmlElement, ListItem, Node,
+};
 use crate::error::{WriteError, WriteResult};
 use crate::options::WriterOptions;
-use crate::CodeBlockType;
 use std::fmt::{self};
 
 use super::processors::{
@@ -54,6 +57,7 @@ impl CommonMarkWriter {
     ///     strict: true,
     ///     hard_break_spaces: false,  // Use backslash for line breaks
     ///     indent_spaces: 2,          // Use 2 spaces for indentation
+    ///     ..Default::default()       // Other options can be set as needed
     /// };
     /// let writer = CommonMarkWriter::with_options(options);
     /// ```
@@ -149,6 +153,8 @@ impl CommonMarkWriter {
             Node::Text(_) => "Text".to_string(),
             Node::Emphasis(_) => "Emphasis".to_string(),
             Node::Strong(_) => "Strong".to_string(),
+            #[cfg(feature = "gfm")]
+            Node::Strikethrough(_) => "Strikethrough".to_string(),
             Node::InlineCode(_) => "InlineCode".to_string(),
             Node::Link { .. } => "Link content".to_string(),
             Node::Image { .. } => "Image alt text".to_string(),
@@ -173,6 +179,8 @@ impl CommonMarkWriter {
             Node::Emphasis(children) | Node::Strong(children) => {
                 children.iter().any(Self::node_contains_newline)
             }
+            #[cfg(feature = "gfm")]
+            Node::Strikethrough(children) => children.iter().any(Self::node_contains_newline),
             Node::HtmlElement(element) => element.children.iter().any(Self::node_contains_newline),
             Node::Link { content, .. } => content.iter().any(Self::node_contains_newline),
             Node::Image { alt, .. } => alt.iter().any(Self::node_contains_newline),
@@ -439,6 +447,25 @@ impl CommonMarkWriter {
                     self.write_list_item_content(content, prefix.len())?;
                 }
             }
+            #[cfg(feature = "gfm")]
+            ListItem::Task { status, content } => {
+                // Only use task list syntax if GFM task lists are enabled
+                if self.options.gfm_tasklists {
+                    let checkbox = match status {
+                        crate::ast::TaskListStatus::Checked => "[x] ",
+                        crate::ast::TaskListStatus::Unchecked => "[ ] ",
+                    };
+
+                    // Use the original list marker (- or number) and append the checkbox
+                    let task_prefix = format!("{}{}", prefix, checkbox);
+                    self.write_str(&task_prefix)?;
+                    self.write_list_item_content(content, task_prefix.len())?;
+                } else {
+                    // If GFM task lists are disabled, just write a normal list item
+                    self.write_str(prefix)?;
+                    self.write_list_item_content(content, prefix.len())?;
+                }
+            }
         }
 
         Ok(())
@@ -483,11 +510,70 @@ impl CommonMarkWriter {
         }
         self.write_char('\n')?;
 
-        // Write alignment row
+        // Write alignment row (default to centered if no alignments provided)
         self.write_char('|')?;
         for _ in 0..headers.len() {
             self.write_str(" --- |")?;
         }
+        self.write_char('\n')?;
+
+        // Write table content
+        for row in rows {
+            self.write_char('|')?;
+            for cell in row {
+                self.check_no_newline(cell, "Table Cell")?;
+                self.write_char(' ')?;
+                self.write(cell)?;
+                self.write_str(" |")?;
+            }
+            self.write_char('\n')?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "gfm")]
+    /// Write a table with alignment (GFM extension)
+    pub(crate) fn write_table_with_alignment(
+        &mut self,
+        headers: &[Node],
+        alignments: &[TableAlignment],
+        rows: &[Vec<Node>],
+    ) -> WriteResult<()> {
+        // Only use alignment when GFM tables are enabled
+        if !self.options.gfm_tables {
+            return self.write_table(headers, rows);
+        }
+
+        // Write header
+        self.write_char('|')?;
+        for header in headers {
+            self.check_no_newline(header, "Table Header")?;
+            self.write_char(' ')?;
+            self.write(header)?;
+            self.write_str(" |")?;
+        }
+        self.write_char('\n')?;
+
+        // Write alignment row
+        self.write_char('|')?;
+
+        // Use provided alignments, or default to center if not enough alignments provided
+        for i in 0..headers.len() {
+            let alignment = if i < alignments.len() {
+                &alignments[i]
+            } else {
+                &TableAlignment::Center
+            };
+
+            match alignment {
+                TableAlignment::Left => self.write_str(" :--- |")?,
+                TableAlignment::Center => self.write_str(" :---: |")?,
+                TableAlignment::Right => self.write_str(" ---: |")?,
+                TableAlignment::None => self.write_str(" --- |")?,
+            }
+        }
+
         self.write_char('\n')?;
 
         // Write table content
@@ -614,6 +700,28 @@ impl CommonMarkWriter {
         Ok(())
     }
 
+    /// Write an extended autolink (GFM extension)
+    #[cfg(feature = "gfm")]
+    pub(crate) fn write_extended_autolink(&mut self, url: &str) -> WriteResult<()> {
+        if !self.options.gfm_autolinks {
+            // If GFM autolinks are disabled, write as plain text
+            self.write_text_content(url)?;
+            return Ok(());
+        }
+
+        // Autolinks shouldn't contain newlines
+        if url.contains('\n') {
+            return Err(WriteError::NewlineInInlineElement(
+                "Extended Autolink URL".to_string(),
+            ));
+        }
+
+        // Just write the URL as plain text for extended autolinks (no angle brackets)
+        self.write_str(url)?;
+
+        Ok(())
+    }
+
     /// Write a link reference definition
     pub(crate) fn write_link_reference_definition(
         &mut self,
@@ -683,14 +791,63 @@ impl CommonMarkWriter {
 
     /// Write an HTML element
     pub(crate) fn write_html_element(&mut self, element: &HtmlElement) -> WriteResult<()> {
+        // Check if the HTML element is disallowed in GFM mode
+        #[cfg(feature = "gfm")]
+        if self.options.enable_gfm
+            && self
+                .options
+                .gfm_disallowed_html_tags
+                .iter()
+                .any(|tag| tag.eq_ignore_ascii_case(&element.tag))
+        {
+            // If the tag is disallowed, write it as escaped text to prevent HTML rendering
+            self.write_str("&lt;")?;
+            self.write_str(&element.tag)?;
+
+            for attr in &element.attributes {
+                self.write_char(' ')?;
+                self.write_str(&attr.name)?;
+                self.write_str("=\"")?;
+                self.write_str(&escape_attribute_value(&attr.value))?;
+                self.write_char('"')?;
+            }
+
+            if element.self_closing {
+                self.write_str(" /&gt;")?;
+                return Ok(());
+            }
+
+            self.write_str("&gt;")?;
+
+            for child in &element.children {
+                self.write(child)?;
+            }
+
+            self.write_str("&lt;/")?;
+            self.write_str(&element.tag)?;
+            self.write_str("&gt;")?;
+            return Ok(());
+        }
+
+        // 检查标签名是否包含潜在危险字符
+        if !is_safe_tag_name(&element.tag) {
+            return Err(WriteError::InvalidHtmlTag(element.tag.clone()));
+        }
+
+        // Normal HTML element rendering if not disallowed or if GFM mode is not enabled
         self.write_char('<')?;
         self.write_str(&element.tag)?;
 
         for attr in &element.attributes {
+            // 检查属性名是否安全
+            if !is_safe_attribute_name(&attr.name) {
+                return Err(WriteError::InvalidHtmlAttribute(attr.name.clone()));
+            }
+
             self.write_char(' ')?;
             self.write_str(&attr.name)?;
             self.write_str("=\"")?;
-            self.write_str(&attr.value)?; // Assume attributes are pre-escaped if needed
+            self.write_str(&escape_attribute_value(&attr.value))?;
             self.write_char('"')?;
         }
 
@@ -739,6 +896,21 @@ impl CommonMarkWriter {
         }
         Ok(())
     }
+
+    /// Write a strikethrough node (GFM extension)
+    #[cfg(feature = "gfm")]
+    pub(crate) fn write_strikethrough(&mut self, content: &[Node]) -> WriteResult<()> {
+        if !self.options.enable_gfm || !self.options.gfm_strikethrough {
+            // If GFM strikethrough is disabled, just write the content without strikethrough
+            for node in content.iter() {
+                self.write(node)?;
+            }
+            return Ok(());
+        }
+
+        // Write content with ~~ delimiters
+        self.write_delimited(content, "~~")
+    }
 }
 
 impl Default for CommonMarkWriter {
@@ -769,4 +941,37 @@ impl CustomNodeWriter for CommonMarkWriter {
         self.buffer.push(c);
         Ok(())
     }
+}
+// Helper functions for HTML safety
+
+/// Check if an HTML tag name is safe
+///
+/// Tag names should only contain letters, numbers, underscores, colons, and hyphens
+fn is_safe_tag_name(tag: &str) -> bool {
+    !tag.is_empty()
+        && tag
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-')
+}
+
+/// Check if an HTML attribute name is safe
+///
+/// Attribute names should only contain letters, numbers, underscores, colons, dots, and hyphens
+fn is_safe_attribute_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-' || c == '.')
+}
+
+/// Escape special characters in HTML attribute values
+///
+/// Converts quotes, less-than signs, greater-than signs, and other special characters to HTML entities
+fn escape_attribute_value(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }

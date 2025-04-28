@@ -24,6 +24,31 @@ pub enum HeadingType {
     Setext,
 }
 
+/// Table column alignment options for GFM tables
+#[cfg(feature = "gfm")]
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum TableAlignment {
+    /// Left alignment (default)
+    #[default]
+    Left,
+    /// Center alignment
+    Center,
+    /// Right alignment
+    Right,
+    /// No specific alignment specified
+    None,
+}
+
+/// Task list item status for GFM task lists
+#[cfg(feature = "gfm")]
+#[derive(Debug, Clone, PartialEq)]
+pub enum TaskListStatus {
+    /// Checked/completed task
+    Checked,
+    /// Unchecked/incomplete task
+    Unchecked,
+}
+
 /// Main node type, representing an element in a CommonMark document
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
@@ -99,6 +124,9 @@ pub enum Node {
     Table {
         /// Header cells
         headers: Vec<Node>,
+        /// Column alignments for the table
+        #[cfg(feature = "gfm")]
+        alignments: Vec<TableAlignment>,
         /// Table rows, each row containing multiple cells
         rows: Vec<Vec<Node>>,
     },
@@ -114,6 +142,9 @@ pub enum Node {
 
     /// Strong emphasis (bold)
     Strong(Vec<Node>),
+
+    /// Strikethrough (GFM extension)
+    Strikethrough(Vec<Node>),
 
     // Links
     /// Link
@@ -153,6 +184,9 @@ pub enum Node {
         /// Whether this is an email autolink
         is_email: bool,
     },
+
+    /// GFM Extended Autolink (without angle brackets, automatically detected)
+    ExtendedAutolink(String),
 
     // Raw HTML
     /// HTML inline element
@@ -195,6 +229,14 @@ pub enum ListItem {
         /// List item content, containing one or more block-level elements
         content: Vec<Node>,
     },
+    /// Task list item (GFM extension)
+    #[cfg(feature = "gfm")]
+    Task {
+        /// Task completion status
+        status: TaskListStatus,
+        /// List item content, containing one or more block-level elements
+        content: Vec<Node>,
+    },
 }
 
 impl Node {
@@ -230,6 +272,7 @@ impl Node {
                 // Emphasis and strong emphasis
                 | Node::Emphasis(_)
                 | Node::Strong(_)
+                | Node::Strikethrough(_)
                 // Links
                 | Node::Link { .. }
                 | Node::ReferenceLink { .. }
@@ -237,6 +280,7 @@ impl Node {
                 | Node::Image { .. }
                 // Autolinks
                 | Node::Autolink { .. }
+                | Node::ExtendedAutolink(_)
                 // Raw HTML
                 | Node::HtmlElement(_)
                 // Hard line breaks
@@ -278,6 +322,52 @@ impl Node {
             language,
             content,
             block_type: CodeBlockType::default(),
+        }
+    }
+
+    /// Create a strikethrough node
+    ///
+    /// # Arguments
+    /// * `content` - Content to be struck through
+    ///
+    /// # Returns
+    /// A new strikethrough node
+    pub fn strikethrough(content: Vec<Node>) -> Self {
+        Node::Strikethrough(content)
+    }
+
+    /// Create a task list item
+    ///
+    /// # Arguments
+    /// * `status` - Task completion status
+    /// * `content` - Task content
+    ///
+    /// # Returns
+    /// A new task list item
+    #[cfg(feature = "gfm")]
+    pub fn task_list_item(status: TaskListStatus, content: Vec<Node>) -> Self {
+        Node::UnorderedList(vec![ListItem::Task { status, content }])
+    }
+
+    /// Create a table with alignment
+    ///
+    /// # Arguments
+    /// * `headers` - Table header cells
+    /// * `alignments` - Column alignments
+    /// * `rows` - Table rows
+    ///
+    /// # Returns
+    /// A new table node with alignment information
+    #[cfg(feature = "gfm")]
+    pub fn table_with_alignment(
+        headers: Vec<Node>,
+        alignments: Vec<TableAlignment>,
+        rows: Vec<Vec<Node>>,
+    ) -> Self {
+        Node::Table {
+            headers,
+            alignments,
+            rows,
         }
     }
 }

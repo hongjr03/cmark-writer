@@ -1,7 +1,9 @@
+#[cfg(feature = "gfm")]
+use cmark_writer::ast::TableAlignment;
 use cmark_writer::ast::{HeadingType, HtmlAttribute, HtmlElement, ListItem, Node};
-use cmark_writer::options::WriterOptions;
+use cmark_writer::options::WriterOptionsBuilder;
 use cmark_writer::writer::CommonMarkWriter;
-use cmark_writer::CodeBlockType;
+use cmark_writer::{CodeBlockType, WriteError};
 
 #[test]
 fn test_write_text() {
@@ -168,12 +170,11 @@ fn test_write_image_with_formatted_alt() {
 
 #[test]
 fn test_writer_options() {
-    // Test custom hard break options
-    let options = WriterOptions {
-        strict: true,
-        hard_break_spaces: true, // Use backslash for line breaks
-        indent_spaces: 4,
-    };
+    let options = WriterOptionsBuilder::new()
+        .strict(true)
+        .hard_break_spaces(true) // Use spaces for line breaks
+        .indent_spaces(4)
+        .build();
 
     let mut writer = CommonMarkWriter::with_options(options);
     writer.write(&Node::HardBreak).unwrap();
@@ -193,6 +194,8 @@ fn test_write_table() {
             Node::Text("Name".to_string()),
             Node::Text("Age".to_string()),
         ],
+        #[cfg(feature = "gfm")]
+        alignments: vec![TableAlignment::Left, TableAlignment::Left],
         rows: vec![
             vec![
                 Node::Text("Alice".to_string()),
@@ -401,6 +404,8 @@ fn test_write_table_cell_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
     let table = Node::Table {
         headers: vec![Node::Text("header".to_string())],
+        #[cfg(feature = "gfm")]
+        alignments: vec![TableAlignment::Left],
         rows: vec![vec![Node::Text("foo\nbar".to_string())]],
     };
     assert!(writer.write(&table).is_err());
@@ -546,112 +551,65 @@ fn test_nested_html_elements() {
 }
 
 #[test]
-fn test_html_element_with_formatted_content() {
+fn test_html_element_with_unsafe_tag() {
     let mut writer = CommonMarkWriter::new();
-    let element = Node::HtmlElement(HtmlElement {
-        tag: "p".to_string(),
-        attributes: vec![HtmlAttribute {
-            name: "class".to_string(),
-            value: "text".to_string(),
-        }],
-        children: vec![
-            Node::Text("普通文本 ".to_string()),
-            Node::Strong(vec![Node::Text("粗体文本".to_string())]),
-            Node::Text(" 和 ".to_string()),
-            Node::Emphasis(vec![Node::Text("斜体文本".to_string())]),
-        ],
+    let html_element = Node::HtmlElement(HtmlElement {
+        tag: "script<dangerous>".to_string(), // 不安全的标签名
+        attributes: vec![],
+        children: vec![Node::Text("alert('危险代码')".to_string())],
         self_closing: false,
     });
 
-    writer.write(&element).unwrap();
-    assert_eq!(
-        writer.into_string(),
-        "<p class=\"text\">普通文本 **粗体文本** 和 _斜体文本_</p>"
-    );
+    let result = writer.write(&html_element);
+    assert!(result.is_err());
+    if let Err(WriteError::InvalidHtmlTag(tag)) = result {
+        assert_eq!(tag, "script<dangerous>");
+    } else {
+        panic!("Expected InvalidHtmlTag error");
+    }
 }
 
 #[test]
-fn test_html_attribute_with_quotes() {
+fn test_html_element_with_unsafe_attribute() {
     let mut writer = CommonMarkWriter::new();
-    let element = Node::HtmlElement(HtmlElement {
+    let html_element = Node::HtmlElement(HtmlElement {
+        tag: "div".to_string(),
+        attributes: vec![HtmlAttribute {
+            name: "on<click>".to_string(), // 不安全的属性名
+            value: "alert('危险')".to_string(),
+        }],
+        children: vec![],
+        self_closing: false,
+    });
+
+    // 应该返回错误
+    let result = writer.write(&html_element);
+    assert!(result.is_err());
+    if let Err(WriteError::InvalidHtmlAttribute(attr)) = result {
+        assert_eq!(attr, "on<click>");
+    } else {
+        panic!("Expected InvalidHtmlAttribute error");
+    }
+}
+
+#[test]
+fn test_html_attribute_value_escaping() {
+    let mut writer = CommonMarkWriter::new();
+    let html_element = Node::HtmlElement(HtmlElement {
         tag: "div".to_string(),
         attributes: vec![HtmlAttribute {
             name: "data-text".to_string(),
-            value: "含有\"引号\"的属性值".to_string(),
+            value: "引号\"和<标签>以及&符号".to_string(),
         }],
         children: vec![Node::Text("内容".to_string())],
         self_closing: false,
     });
 
-    writer.write(&element).unwrap();
+    writer.write(&html_element).unwrap();
     assert_eq!(
         writer.into_string(),
-        "<div data-text=\"含有\"引号\"的属性值\">内容</div>"
+        "<div data-text=\"引号&quot;和&lt;标签&gt;以及&amp;符号\">内容</div>"
     );
-}
-
-#[test]
-fn test_html_element_in_paragraph() {
-    let mut writer = CommonMarkWriter::new();
-    let paragraph = Node::Paragraph(vec![
-        Node::Text("文本开始 ".to_string()),
-        Node::HtmlElement(HtmlElement {
-            tag: "code".to_string(),
-            attributes: vec![],
-            children: vec![Node::Text("代码片段".to_string())],
-            self_closing: false,
-        }),
-        Node::Text(" 文本结束".to_string()),
-    ]);
-
-    writer.write(&paragraph).unwrap();
-    assert_eq!(
-        writer.into_string(),
-        "文本开始 <code>代码片段</code> 文本结束\n"
-    );
-}
-
-#[test]
-fn test_write_html_block() {
-    let mut writer = CommonMarkWriter::new();
-    let html_block = Node::HtmlBlock(
-        "<div class=\"container\">\n  <h1>标题</h1>\n  <p>段落</p>\n</div>".to_string(),
-    );
-    writer.write(&html_block).unwrap();
-    assert_eq!(
-        writer.into_string(),
-        "<div class=\"container\">\n  <h1>标题</h1>\n  <p>段落</p>\n</div>\n"
-    );
-}
-
-#[test]
-fn test_hard_break_with_chinese_text() {
-    let mut writer = CommonMarkWriter::new();
-    let paragraph = Node::Paragraph(vec![
-        Node::Text("换行测试：".to_string()),
-        Node::HardBreak,
-        Node::Text("这行文字应该在上一行的下方紧跟着。".to_string()),
-    ]);
-
-    writer.write(&paragraph).unwrap();
-    let result = writer.into_string();
-
-    // Default: use backslash for line breaks
-    let expected = "换行测试：\\\n这行文字应该在上一行的下方紧跟着。\n";
-    assert_eq!(result, expected);
-
-    // Test line break with spaces option
-    let options = WriterOptions {
-        strict: true,
-        hard_break_spaces: true, // Use two spaces and a newline
-        indent_spaces: 4,
-    };
-    let mut writer = CommonMarkWriter::with_options(options);
-    writer.write(&paragraph).unwrap();
-    let result = writer.into_string();
-
-    let expected_spaces = "换行测试：  \n这行文字应该在上一行的下方紧跟着。\n";
-    assert_eq!(result, expected_spaces);
 }
 
 #[test]

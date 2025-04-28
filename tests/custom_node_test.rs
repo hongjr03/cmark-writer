@@ -1,3 +1,5 @@
+#[cfg(feature = "gfm")]
+use cmark_writer::ast::TableAlignment;
 use cmark_writer::coded_error;
 use cmark_writer::custom_error;
 use cmark_writer::custom_node;
@@ -290,7 +292,8 @@ fn test_figure_with_table() {
                     Node::Text("200".to_string()),
                 ],
             ],
-            // alignments: vec![Alignment::Left, Alignment::Right],
+            #[cfg(feature = "gfm")]
+            alignments: vec![TableAlignment::Left, TableAlignment::Right],
         }),
         caption: "Figure 3: Sample data table".to_string(),
         id: Some("data-table".to_string()),

@@ -11,10 +11,16 @@ pub use crate::error::{
 pub use crate::options::WriterOptions;
 pub use crate::writer::CommonMarkWriter;
 
-// 导出过程宏属性
+// Export proc-macro attributes
 pub use cmark_writer_macros::{coded_error, custom_error, custom_node};
 
 pub mod ast;
 pub mod error;
 pub mod options;
 pub mod writer;
+
+/// GitHub Flavored Markdown (GFM) extensions
+///
+/// This module is only available when the `gfm` feature is enabled.
+#[cfg(feature = "gfm")]
+pub mod gfm;

@@ -19,6 +19,10 @@ pub enum WriteError {
     UnsupportedNodeType,
     /// Invalid structure in a node (e.g., mismatched table columns)
     InvalidStructure(String),
+    /// An invalid HTML tag was found (contains unsafe characters)
+    InvalidHtmlTag(String),
+    /// An invalid HTML attribute was found (contains unsafe characters)
+    InvalidHtmlAttribute(String),
     /// A custom error with a message and optional error code.
     Custom {
         /// Custom error message
@@ -47,6 +51,12 @@ impl Display for WriteError {
             },
             WriteError::InvalidStructure(msg) => {
                 write!(f, "Invalid structure: {}", msg)
+            },
+            WriteError::InvalidHtmlTag(tag) => {
+                write!(f, "Invalid HTML tag name: '{}'. Tag names should only contain alphanumeric characters, underscores, colons, or hyphens.", tag)
+            },
+            WriteError::InvalidHtmlAttribute(attr) => {
+                write!(f, "Invalid HTML attribute name: '{}'. Attribute names should only contain alphanumeric characters, underscores, colons, dots, or hyphens.", attr)
             },
             WriteError::Custom { message, code } => {
                 if let Some(code) = code {

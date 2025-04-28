@@ -42,7 +42,17 @@ impl NodeProcessor for BlockNodeProcessor {
             Node::UnorderedList(items) => writer.write_unordered_list(items),
             Node::OrderedList { start, items } => writer.write_ordered_list(*start, items),
             Node::ThematicBreak => writer.write_thematic_break(),
-            Node::Table { headers, rows } => writer.write_table(headers, rows),
+
+            #[cfg(feature = "gfm")]
+            Node::Table {
+                headers,
+                alignments,
+                rows,
+            } => writer.write_table_with_alignment(headers, alignments, rows),
+
+            #[cfg(not(feature = "gfm"))]
+            Node::Table { headers, rows, .. } => writer.write_table(headers, rows),
+
             Node::HtmlBlock(content) => writer.write_html_block(content),
             Node::LinkReferenceDefinition {
                 label,
@@ -73,6 +83,10 @@ impl NodeProcessor for InlineNodeProcessor {
             Node::Text(content) => writer.write_text_content(content),
             Node::Emphasis(content) => writer.write_delimited(content, "_"),
             Node::Strong(content) => writer.write_delimited(content, "**"),
+
+            #[cfg(feature = "gfm")]
+            Node::Strikethrough(content) => writer.write_strikethrough(content),
+
             Node::InlineCode(content) => writer.write_code_content(content),
             Node::Link {
                 url,
@@ -81,6 +95,10 @@ impl NodeProcessor for InlineNodeProcessor {
             } => writer.write_link(url, title, content),
             Node::Image { url, title, alt } => writer.write_image(url, title, alt),
             Node::Autolink { url, is_email } => writer.write_autolink(url, *is_email),
+
+            #[cfg(feature = "gfm")]
+            Node::ExtendedAutolink(url) => writer.write_extended_autolink(url),
+
             Node::ReferenceLink { label, content } => writer.write_reference_link(label, content),
             Node::HtmlElement(element) => writer.write_html_element(element),
             Node::SoftBreak => writer.write_soft_break(),
