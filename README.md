@@ -17,10 +17,7 @@ use cmark_writer::writer::CommonMarkWriter;
 
 // Create a document
 let document = Node::Document(vec![
-    Node::Heading {
-        level: 1,
-        content: vec![Node::Text("Hello CommonMark".to_string())],
-    },
+    Node::heading(1, vec![Node::Text("Hello CommonMark".to_string())]),
     Node::Paragraph(vec![
         Node::Text("This is a simple ".to_string()),
         Node::Strong(vec![Node::Text("example".to_string())]),
