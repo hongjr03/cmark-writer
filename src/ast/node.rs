@@ -25,7 +25,7 @@ pub enum HeadingType {
 }
 
 /// Main node type, representing an element in a CommonMark document
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     /// Root document node, contains child nodes
     Document(Vec<Node>),
@@ -164,7 +164,6 @@ pub enum Node {
 
     // Soft line breaks
     /// Soft break (single line break)
-    #[default]
     SoftBreak,
 
     // Textual content
@@ -173,6 +172,12 @@ pub enum Node {
 
     /// Custom node that allows users to implement their own writing behavior
     Custom(Box<dyn CustomNode>),
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Node::Document(vec![])
+    }
 }
 
 /// List item type
