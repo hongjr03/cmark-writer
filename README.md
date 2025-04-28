@@ -4,6 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/cmark-writer.svg)](https://crates.io/crates/cmark-writer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Downloads](https://img.shields.io/crates/d/cmark-writer.svg)](https://crates.io/crates/cmark-writer)
+[![Codecov](https://codecov.io/gh/hongjr03/cmark-writer/branch/master/graph/badge.svg)](https://codecov.io/gh/hongjr03/cmark-writer)
 
 A CommonMark writer implementation in Rust.
 
