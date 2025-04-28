@@ -59,7 +59,6 @@ writer.write(&Node::Text("Example".to_string())).unwrap();
 ### Core Types
 
 - `Node` - Represents various CommonMark node types
-- `ListItem` - Represents list items, including task list items
 - `CommonMarkWriter` - Converts nodes to CommonMark text
 - `WriterOptions` - Customization options for the writer
 
