@@ -2,9 +2,12 @@
 #![deny(missing_docs)]
 
 pub use crate::ast::{
-    Alignment, CustomNode, CustomNodeWriter, HtmlAttribute, HtmlElement, ListItem, Node,
+    CodeBlockType, CustomNode, CustomNodeWriter, HeadingType, HtmlAttribute, HtmlElement, ListItem,
+    Node,
 };
-pub use crate::error::{WriteError, WriteResult};
+pub use crate::error::{
+    CodedError, CustomErrorFactory, StructureError, WriteError, WriteResult, WriteResultExt,
+};
 pub use crate::options::WriterOptions;
 pub use crate::writer::CommonMarkWriter;
 
