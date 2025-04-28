@@ -1,32 +1,29 @@
-use cmark_writer::ast::HeadingType;
-use cmark_writer::define_custom_errors;
-use cmark_writer::derive_custom_node;
+use cmark_writer::coded_error;
+use cmark_writer::custom_error;
+use cmark_writer::custom_node;
 use cmark_writer::CodeBlockType;
 use cmark_writer::CommonMarkWriter;
-use cmark_writer::CustomErrorFactory;
+use cmark_writer::HeadingType;
 use cmark_writer::WriteResult;
 use cmark_writer::{CustomNodeWriter, Node};
 
-define_custom_errors! {
+// 使用属性宏定义自定义错误
+#[custom_error(format = "表格行列不匹配：{}")]
+struct TableRowColumnMismatchError(pub &'static str);
 
-    struct TableRowColumnMismatchError(message: &str) with format = "表格行列不匹配：{}";
+#[custom_error(format = "表格空表头：{}")]
+struct TableEmptyHeaderError(pub &'static str);
 
-
-    struct TableEmptyHeaderError(message: &str) with format = "表格空表头：{}";
-
-
-    coded TableAlignmentError(message: &str, code: &str);
-}
+#[coded_error]
+struct TableAlignmentError(pub String, pub String);
 
 // A simple custom node example: representing highlighted text
 #[derive(Debug, PartialEq, Clone)]
+#[custom_node]
 struct HighlightNode {
     content: String,
     color: String,
 }
-
-// Using macro to implement CustomNode trait
-derive_custom_node!(HighlightNode);
 
 // Implementing required methods for HighlightNode
 impl HighlightNode {
@@ -47,14 +44,12 @@ impl HighlightNode {
 
 // Example of a custom block-level node implementation
 #[derive(Debug, PartialEq, Clone)]
+#[custom_node]
 struct CalloutNode {
     title: String,
     content: String,
     style: String, // e.g.: note, warning, danger
 }
-
-// Using macro to implement CustomNode trait
-derive_custom_node!(CalloutNode);
 
 // Implementing required methods for CalloutNode
 impl CalloutNode {
@@ -155,6 +150,7 @@ fn test_custom_block_in_document() {
 /// and has a caption. This allows for advanced document structures like
 /// figures with numbered captions, images with descriptions, etc.
 #[derive(Debug, PartialEq, Clone)]
+#[custom_node]
 struct FigureNode {
     /// The main content of the figure, can be any block node
     body: Box<Node>,
@@ -163,9 +159,6 @@ struct FigureNode {
     /// Optional ID for referencing
     id: Option<String>,
 }
-
-// Using macro to implement CustomNode trait
-derive_custom_node!(FigureNode);
 
 impl FigureNode {
     // Helper method to write a node to the provided writer
@@ -347,16 +340,14 @@ fn test_figure_in_document() {
 }
 
 #[test]
-fn test_derive_custom_node_macro() {
-    // A simple alert box custom node using the macro
+fn test_custom_node_attribute() {
+    // A simple alert box custom node using the attribute macro
     #[derive(Debug, Clone, PartialEq)]
+    #[custom_node]
     struct AlertBox {
         message: String,
         level: String, // info, warning, error
     }
-
-    // Use the macro to implement CustomNode trait
-    derive_custom_node!(AlertBox);
 
     // Implement the required methods for AlertBox
     impl AlertBox {
@@ -421,24 +412,21 @@ enum Alignment {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+#[custom_node]
 struct AlignedTableNode {
     headers: Vec<Node>,
     rows: Vec<Vec<Node>>,
     alignments: Vec<Alignment>,
 }
 
-derive_custom_node!(AlignedTableNode);
-
 impl AlignedTableNode {
     fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
         if self.rows.iter().any(|row| row.len() != self.headers.len()) {
-            return Err(
-                TableRowColumnMismatchError::new("表格行单元格数与表头数不匹配").into_error(),
-            );
+            return Err(TableRowColumnMismatchError("表格行单元格数与表头数不匹配").into_error());
         }
 
         if self.headers.is_empty() {
-            return Err(TableEmptyHeaderError::new("表格必须至少有一个表头").into_error());
+            return Err(TableEmptyHeaderError("表格必须至少有一个表头").into_error());
         }
 
         let alignments = if self.alignments.len() < self.headers.len() {

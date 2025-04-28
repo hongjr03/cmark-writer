@@ -1,5 +1,6 @@
 use cmark_writer::ast::HeadingType;
-use cmark_writer::define_custom_errors;
+use cmark_writer::coded_error;
+use cmark_writer::custom_error;
 use cmark_writer::CommonMarkWriter;
 use cmark_writer::Node;
 use cmark_writer::WriteError;
@@ -193,79 +194,89 @@ fn test_custom_errors() {
 }
 
 #[test]
-fn test_custom_error_macro() {
-    use cmark_writer::define_custom_errors;
-    use cmark_writer::error::WriteError;
-    use cmark_writer::CustomErrorFactory;
+fn test_custom_error_attribute() {
+    // 使用属性宏定义自定义错误
 
-    define_custom_errors! {
-        struct TableColumnMismatchError(message: &str) with format = "表格列数不匹配：{}";
+    #[custom_error(format = "表格列数不匹配：{}")]
+    struct TableColumnMismatchError(pub &'static str);
 
-        struct TableEmptyHeaderError(message: &str) with format = "表格空表头：{}";
-        struct DocumentFormatError(message: &str) with format = "文档格式错误：{}";
+    #[custom_error(format = "表格空表头：{}")]
+    struct TableEmptyHeaderError(pub &'static str);
 
-        coded MarkdownSyntaxError(message: &str, code: &str);
+    #[custom_error(format = "文档格式错误：{}")]
+    struct DocumentFormatError(pub &'static str);
 
-    }
+    #[coded_error]
+    struct MarkdownSyntaxError(pub String, pub String);
 
-    let err1 = TableColumnMismatchError::new("第 3 行有 4 列，但表头只有 3 列").into_error();
+    let err1 = TableColumnMismatchError("第 3 行有 4 列，但表头只有 3 列").into_error();
     assert_eq!(
         err1.to_string(),
         "Invalid structure: 表格列数不匹配：第 3 行有 4 列，但表头只有 3 列"
     );
 
-    let err2 = TableEmptyHeaderError::new("表格必须包含至少一个表头").into_error();
+    let err2 = TableEmptyHeaderError("表格必须包含至少一个表头").into_error();
     assert_eq!(
         err2.to_string(),
         "Invalid structure: 表格空表头：表格必须包含至少一个表头"
     );
 
-    let err3 = MarkdownSyntaxError::new("缺少闭合代码块标记", "CODE_BLOCK_UNCLOSED").into_error();
+    let err3 = MarkdownSyntaxError(
+        "缺少闭合代码块标记".to_string(),
+        "CODE_BLOCK_UNCLOSED".to_string(),
+    )
+    .into_error();
     assert_eq!(
         err3.to_string(),
         "Custom error [CODE_BLOCK_UNCLOSED]: 缺少闭合代码块标记"
     );
 
-    let err4 = DocumentFormatError::new("文档超过最大嵌套深度").into_error();
+    let err4 = DocumentFormatError("文档超过最大嵌套深度").into_error();
     assert_eq!(
         err4.to_string(),
         "Invalid structure: 文档格式错误：文档超过最大嵌套深度"
     );
 
-    let err5: WriteError = TableColumnMismatchError::new("错误示例").into();
+    let err5: WriteError = TableColumnMismatchError("错误示例").into();
     assert!(matches!(err5, WriteError::InvalidStructure(_)));
 }
 
 #[test]
 fn test_mixed_order_custom_errors() {
-    use cmark_writer::define_custom_errors;
+    // 使用属性宏定义多个自定义错误，顺序混合
 
-    use cmark_writer::CustomErrorFactory;
+    #[coded_error]
+    struct ValidationError(pub String, pub String);
 
-    define_custom_errors! {
+    #[custom_error(format = "解析错误：{}")]
+    struct ParseError(pub &'static str);
 
-        coded ValidationError(message: &str, code: &str);
-        struct ParseError(message: &str) with format = "解析错误：{}";
-        coded FormatError(message: &str, code: &str);
-        struct RenderError(message: &str) with format = "渲染错误：{}";
-    }
+    #[coded_error]
+    struct FormatError(pub String, pub String);
 
-    let err1 = ValidationError::new("数据验证失败", "DATA_VALIDATION_FAILED").into_error();
+    #[custom_error(format = "渲染错误：{}")]
+    struct RenderError(pub &'static str);
+
+    let err1 = ValidationError(
+        "数据验证失败".to_string(),
+        "DATA_VALIDATION_FAILED".to_string(),
+    )
+    .into_error();
     assert_eq!(
         err1.to_string(),
         "Custom error [DATA_VALIDATION_FAILED]: 数据验证失败"
     );
 
-    let err2 = ParseError::new("无法解析 Markdown").into_error();
+    let err2 = ParseError("无法解析 Markdown").into_error();
     assert_eq!(
         err2.to_string(),
         "Invalid structure: 解析错误：无法解析 Markdown"
     );
 
-    let err3 = FormatError::new("格式化失败", "FORMAT_FAILED").into_error();
+    let err3 = FormatError("格式化失败".to_string(), "FORMAT_FAILED".to_string()).into_error();
     assert_eq!(err3.to_string(), "Custom error [FORMAT_FAILED]: 格式化失败");
 
-    let err4 = RenderError::new("无法渲染表格").into_error();
+    let err4 = RenderError("无法渲染表格").into_error();
     assert_eq!(
         err4.to_string(),
         "Invalid structure: 渲染错误：无法渲染表格"
