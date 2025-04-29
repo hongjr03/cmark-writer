@@ -1,5 +1,6 @@
 export default {
   title: "cmark-writer",
+  base: '/cmark-writer/',
 
   locales: {
     root: {
