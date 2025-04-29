@@ -3,7 +3,7 @@ name: Deploy VitePress Docs
 on:
   # 当 main 分支有推送时触发
   push:
-    branches: [main]
+    branches: [main, master]
   # 允许手动触发工作流
   workflow_dispatch:
 
