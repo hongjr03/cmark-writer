@@ -81,8 +81,8 @@ impl NodeProcessor for InlineNodeProcessor {
 
         match node {
             Node::Text(content) => writer.write_text_content(content),
-            Node::Emphasis(content) => writer.write_delimited(content, "_"),
-            Node::Strong(content) => writer.write_delimited(content, "**"),
+            Node::Emphasis(content) => writer.write_emphasis(content),
+            Node::Strong(content) => writer.write_strong(content),
 
             #[cfg(feature = "gfm")]
             Node::Strikethrough(content) => writer.write_strikethrough(content),

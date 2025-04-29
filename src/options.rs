@@ -11,6 +11,14 @@ pub struct WriterOptions {
     pub hard_break_spaces: bool,
     /// Number of spaces to use for indentation levels
     pub indent_spaces: usize,
+    /// Character to use for unordered list markers (-, +, or *)
+    pub list_marker: char,
+    /// Character to use for thematic breaks (-, *, or _)
+    pub thematic_break_char: char,
+    /// Character to use for emphasis (_, or *)
+    pub emphasis_char: char,
+    /// Character to use for strong emphasis (_, or *)
+    pub strong_char: char,
 
     /// Whether to enable GitHub Flavored Markdown (GFM) extensions
     #[cfg(feature = "gfm")]
@@ -43,6 +51,10 @@ impl Default for WriterOptions {
             strict: true,
             hard_break_spaces: false,
             indent_spaces: 4,
+            list_marker: '-',
+            thematic_break_char: '-',
+            emphasis_char: '_',
+            strong_char: '*',
 
             #[cfg(feature = "gfm")]
             enable_gfm: false,
@@ -103,6 +115,38 @@ impl WriterOptionsBuilder {
     /// Set number of spaces for indentation
     pub fn indent_spaces(mut self, indent_spaces: usize) -> Self {
         self.options.indent_spaces = indent_spaces;
+        self
+    }
+
+    /// Set the marker character for unordered lists (-, +, or *)
+    pub fn list_marker(mut self, marker: char) -> Self {
+        if marker == '-' || marker == '+' || marker == '*' {
+            self.options.list_marker = marker;
+        }
+        self
+    }
+
+    /// Set the character for thematic breaks (-, *, or _)
+    pub fn thematic_break_char(mut self, char: char) -> Self {
+        if char == '-' || char == '*' || char == '_' {
+            self.options.thematic_break_char = char;
+        }
+        self
+    }
+
+    /// Set the character for emphasis (_, or *)
+    pub fn emphasis_char(mut self, char: char) -> Self {
+        if char == '_' || char == '*' {
+            self.options.emphasis_char = char;
+        }
+        self
+    }
+
+    /// Set the character for strong emphasis (_, or *)
+    pub fn strong_char(mut self, char: char) -> Self {
+        if char == '_' || char == '*' {
+            self.options.strong_char = char;
+        }
         self
     }
 

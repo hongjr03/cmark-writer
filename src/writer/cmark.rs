@@ -330,7 +330,8 @@ impl CommonMarkWriter {
 
     /// Write a thematic break (horizontal rule)
     pub(crate) fn write_thematic_break(&mut self) -> WriteResult<()> {
-        self.write_str("---")?;
+        let char = self.options.thematic_break_char;
+        self.write_str(&format!("{}{}{}", char, char, char))?;
         Ok(())
     }
 
@@ -382,11 +383,14 @@ impl CommonMarkWriter {
 
     /// Write an unordered list node
     pub(crate) fn write_unordered_list(&mut self, items: &[ListItem]) -> WriteResult<()> {
+        let list_marker = self.options.list_marker;
+        let prefix = format!("{} ", list_marker);
+
         for (i, item) in items.iter().enumerate() {
             if i > 0 {
                 self.write_char('\n')?;
             }
-            self.write_list_item(item, "- ")?;
+            self.write_list_item(item, &prefix)?;
         }
 
         Ok(())
@@ -556,6 +560,7 @@ impl CommonMarkWriter {
         self.write_char('\n')?;
 
         // Write alignment row
+
         self.write_char('|')?;
 
         // Use provided alignments, or default to center if not enough alignments provided
@@ -895,6 +900,19 @@ impl CommonMarkWriter {
             self.write_char('\n')?;
         }
         Ok(())
+    }
+
+    /// Write an emphasis (italic) node with custom delimiter
+    pub(crate) fn write_emphasis(&mut self, content: &[Node]) -> WriteResult<()> {
+        let delimiter = self.options.emphasis_char.to_string();
+        self.write_delimited(content, &delimiter)
+    }
+
+    /// Write a strong emphasis (bold) node with custom delimiter
+    pub(crate) fn write_strong(&mut self, content: &[Node]) -> WriteResult<()> {
+        let char = self.options.strong_char;
+        let delimiter = format!("{}{}", char, char);
+        self.write_delimited(content, &delimiter)
     }
 
     /// Write a strikethrough node (GFM extension)
