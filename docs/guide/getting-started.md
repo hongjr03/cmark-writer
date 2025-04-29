@@ -68,4 +68,4 @@ To learn more about cmark-writer:
 
 - Explore [Core Concepts](./core-concepts/index.md) to understand the fundamentals
 - Try the [Examples](./examples/index.md) to see more complex use cases
-- Check the [API Reference](./api-reference/index.md) for detailed documentation
+- Check the [API Reference](../api/index.md) for detailed documentation

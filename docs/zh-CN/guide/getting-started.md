@@ -66,6 +66,6 @@ fn main() {
 
 要了解有关 cmark-writer 的更多信息：
 
-- 探索[核心概念](/guide/core-concepts/index)以了解基础知识
-- 尝试[示例](/guide/examples/index)以查看更复杂的用例
-- 查看[API 参考](/api/index)获取详细文档
+- 探索[核心概念](./core-concepts/index.md)以了解基础知识
+- 尝试[示例](./examples/index.md)以查看更复杂的用例
+- 查看[API 参考](../api/index.md)获取详细文档
