@@ -1,9 +1,0 @@
-[book]
-authors = ["Hong Jiarong"]
-language = "en"
-multilingual = false
-src = "src"
-title = "cmark-writer-doc"
-
-[output.html.playground]
-runnable = false
