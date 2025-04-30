@@ -1,16 +1,16 @@
 use cmark_writer::ast::HeadingType;
 use cmark_writer::coded_error;
-use cmark_writer::custom_error;
 use cmark_writer::custom_node;
+use cmark_writer::structure_error;
 use cmark_writer::CommonMarkWriter;
 use cmark_writer::WriteResult;
 use cmark_writer::{CustomNodeWriter, Node};
 
 // 使用属性宏定义自定义错误
-#[custom_error(format = "表格行列不匹配：{}")]
+#[structure_error(format = "表格行列不匹配：{}")]
 pub struct TableRowColumnMismatchError(pub &'static str);
 
-#[custom_error(format = "表格空表头：{}")]
+#[structure_error(format = "表格空表头：{}")]
 pub struct TableEmptyHeaderError(pub &'static str);
 
 #[coded_error]

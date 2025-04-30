@@ -1,6 +1,6 @@
 use cmark_writer::ast::HeadingType;
 use cmark_writer::coded_error;
-use cmark_writer::custom_error;
+use cmark_writer::structure_error;
 use cmark_writer::CommonMarkWriter;
 use cmark_writer::Node;
 use cmark_writer::WriteError;
@@ -197,13 +197,13 @@ fn test_custom_errors() {
 fn test_custom_error_attribute() {
     // 使用属性宏定义自定义错误
 
-    #[custom_error(format = "表格列数不匹配：{}")]
+    #[structure_error(format = "表格列数不匹配：{}")]
     struct TableColumnMismatchError(pub &'static str);
 
-    #[custom_error(format = "表格空表头：{}")]
+    #[structure_error(format = "表格空表头：{}")]
     struct TableEmptyHeaderError(pub &'static str);
 
-    #[custom_error(format = "文档格式错误：{}")]
+    #[structure_error(format = "文档格式错误：{}")]
     struct DocumentFormatError(pub &'static str);
 
     #[coded_error]
@@ -248,13 +248,13 @@ fn test_mixed_order_custom_errors() {
     #[coded_error]
     struct ValidationError(pub String, pub String);
 
-    #[custom_error(format = "解析错误：{}")]
+    #[structure_error(format = "解析错误：{}")]
     struct ParseError(pub &'static str);
 
     #[coded_error]
     struct FormatError(pub String, pub String);
 
-    #[custom_error(format = "渲染错误：{}")]
+    #[structure_error(format = "渲染错误：{}")]
     struct RenderError(pub &'static str);
 
     let err1 = ValidationError(

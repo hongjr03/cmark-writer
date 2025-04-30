@@ -81,13 +81,13 @@ pub fn custom_node(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Example
 ///
 /// ```rust
-/// use cmark_writer_macros::custom_error;
+/// use cmark_writer_macros::structure_error;
 ///
-/// #[custom_error(format = "Table column mismatch: {}")]
+/// #[structure_error(format = "Table column mismatch: {}")]
 /// struct TableColumnMismatchError(pub &'static str);
 /// ```
 #[proc_macro_attribute]
-pub fn custom_error(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn structure_error(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_str = attr.to_string();
     let input = parse_macro_input!(item as DeriveInput);
     let name = &input.ident;

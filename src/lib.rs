@@ -12,7 +12,7 @@ pub use crate::options::WriterOptions;
 pub use crate::writer::CommonMarkWriter;
 
 // Export proc-macro attributes
-pub use cmark_writer_macros::{coded_error, custom_error, custom_node};
+pub use cmark_writer_macros::{coded_error, custom_node, structure_error};
 
 pub mod ast;
 pub mod error;
