@@ -19,6 +19,14 @@ pub trait CustomNode: std::fmt::Debug + Send + Sync {
 
     /// Convert to Any for type casting
     fn as_any(&self) -> &dyn Any;
+
+    /// Convert to mutable Any for type casting
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+
+    /// Get the type name of the custom node for pattern matching
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 /// Trait for custom node writer implementation

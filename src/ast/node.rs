@@ -370,4 +370,17 @@ impl Node {
             rows,
         }
     }
+    /// Check if a custom node is of a specific type, and return a reference to that type
+    pub fn as_custom_type<T: CustomNode + 'static>(&self) -> Option<&T> {
+        if let Node::Custom(node) = self {
+            node.as_any().downcast_ref::<T>()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a node is a custom node of a specific type
+    pub fn is_custom_type<T: CustomNode + 'static>(&self) -> bool {
+        self.as_custom_type::<T>().is_some()
+    }
 }

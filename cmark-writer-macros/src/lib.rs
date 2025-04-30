@@ -1,20 +1,47 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{
+    parse::Parse, parse::ParseStream, parse_macro_input, DeriveInput, Ident, LitBool, Token,
+};
+
+/// Parse custom_node attribute parameters
+struct CustomNodeArgs {
+    is_block: Option<bool>,
+}
+
+impl Parse for CustomNodeArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut is_block = None;
+
+        if input.is_empty() {
+            return Ok(CustomNodeArgs { is_block });
+        }
+
+        let ident: Ident = input.parse()?;
+        if ident == "block" {
+            let _: Token![=] = input.parse()?;
+            let value: LitBool = input.parse()?;
+            is_block = Some(value.value);
+        }
+
+        Ok(CustomNodeArgs { is_block })
+    }
+}
 
 /// Custom node attribute macro, replaces the original derive_custom_node! macro
 ///
-/// This macro automatically implements the CustomNode trait, users only need to implement
-/// write_custom and is_block_custom methods
+/// This macro automatically implements the CustomNode trait. Users can specify
+/// whether the node is a block element using the `block` parameter.
 ///
 /// # Example
 ///
 /// ```rust
 /// use cmark_writer_macros::custom_node;
 ///
+/// // Specified as an inline element
 /// #[derive(Debug, Clone, PartialEq)]
-/// #[custom_node]
+/// #[custom_node(block=false)]
 /// struct HighlightNode {
 ///     content: String,
 ///     color: String,
@@ -29,16 +56,44 @@ use syn::{parse_macro_input, DeriveInput};
 ///         writer.write_str("</span>")?;
 ///         Ok(())
 ///     }
-///     
-///     fn is_block_custom(&self) -> bool {
-///         false // This is an inline element
+/// }
+///
+/// // Specified as a block element
+/// #[derive(Debug, Clone, PartialEq)]
+/// #[custom_node(block=true)]
+/// struct AlertNode {
+///     content: String,
+/// }
+///
+/// impl AlertNode {
+///     fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+///         writer.write_str("<div class=\"alert\">")?;
+///         writer.write_str(&self.content)?;
+///         writer.write_str("</div>")?;
+///         Ok(())
 ///     }
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn custom_node(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = syn::parse_macro_input!(attr as CustomNodeArgs);
     let input = parse_macro_input!(item as DeriveInput);
     let name = &input.ident;
+
+    // Determine if it's a block element. If not specified, the user needs to provide an is_block_custom method
+    let is_block_impl = if let Some(is_block) = args.is_block {
+        quote! {
+            fn is_block(&self) -> bool {
+                #is_block
+            }
+        }
+    } else {
+        quote! {
+            fn is_block(&self) -> bool {
+                self.is_block_custom()
+            }
+        }
+    };
 
     let expanded = quote! {
         #input
@@ -63,12 +118,26 @@ pub fn custom_node(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
-            fn is_block(&self) -> bool {
-                self.is_block_custom()
-            }
+            #is_block_impl
 
             fn as_any(&self) -> &dyn std::any::Any {
                 self
+            }
+
+            fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+                self
+            }
+        }
+
+        // Implementing the CustomNode trait for Box<dyn CustomNode>
+        impl #name {
+            pub fn matches(node: &dyn ::cmark_writer::ast::CustomNode) -> bool {
+                node.type_name() == std::any::type_name::<#name>() ||
+                    node.as_any().downcast_ref::<#name>().is_some()
+            }
+
+            pub fn extract(node: Box<dyn ::cmark_writer::ast::CustomNode>) -> Option<#name> {
+                node.as_any().downcast_ref::<#name>().map(|n| n.clone())
             }
         }
     };
