@@ -1,6 +1,6 @@
 [package]
 name = "cmark-writer"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 description = "A CommonMark writer implementation in Rust for serializing AST nodes to CommonMark format"
 license = "MIT"
@@ -11,7 +11,7 @@ categories = ["text-processing"]
 readme = "README.md"
 
 [dependencies]
-cmark-writer-macros = { path = "./cmark-writer-macros", version = "0.6.1" }
+cmark-writer-macros = { path = "./cmark-writer-macros", version = "0.6.2" }
 
 [features]
 default = []

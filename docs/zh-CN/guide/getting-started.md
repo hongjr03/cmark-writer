@@ -8,14 +8,14 @@
 
 ```toml
 [dependencies]
-cmark-writer = "0.6.1"
+cmark-writer = "0.6.2"
 ```
 
 如果您需要 GitHub Flavored Markdown 支持，请启用 `gfm` 功能：
 
 ```toml
 [dependencies]
-cmark-writer = { version = "0.6.1", features = ["gfm"] }
+cmark-writer = { version = "0.6.2", features = ["gfm"] }
 ```
 
 ## 基本示例

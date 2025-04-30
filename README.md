@@ -76,7 +76,7 @@ Enable GFM features by adding to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-cmark-writer = { version = "0.6.1", features = ["gfm"] }
+cmark-writer = { version = "0.6.2", features = ["gfm"] }
 ```
 
 GFM Support:

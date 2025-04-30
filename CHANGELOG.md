@@ -2,6 +2,20 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.6.2] - 2025-04-30
+
+### Features
+
+- Added support for custom node type matching with `is_custom_type` and `as_custom_type` helper methods
+- Enhanced `CustomNode` trait with `type_name` method for better type identification
+- Updated `custom_node` attribute macro to support `block=true/false` parameter for simpler node definition
+- Added `as_any_mut` method to `CustomNode` trait for mutable access to custom nodes
+
+### Documentation
+
+- Added documentation for custom node pattern matching in README and guide
+- Created example tests for custom node pattern matching
+
 ## [0.6.1] - 2025-04-28
 
 ### Features
