@@ -10,7 +10,7 @@ GitHub Flavored Markdown (GFM) 扩展了 CommonMark 规范，增加了特别适�
 
     ```toml
     [dependencies]
-    cmark-writer = { version = "0.6.2", features = ["gfm"] }
+    cmark-writer = { version = "0.6.3", features = ["gfm"] }
     ```
 
 2. 在您的编写器中启用 GFM 选项：

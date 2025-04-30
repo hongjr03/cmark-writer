@@ -2,6 +2,13 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.6.3] - 2025-04-30
+
+### Features
+
+- Added new `escape_special_chars` option to WriterOptions to control text escaping (default is false)
+- Enhanced text handling with optional character escaping
+
 ## [0.6.2] - 2025-04-30
 
 ### Features

@@ -8,14 +8,14 @@ Add cmark-writer to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-cmark-writer = "0.6.2"
+cmark-writer = "0.6.3"
 ```
 
 If you need GitHub Flavored Markdown support, enable the `gfm` feature:
 
 ```toml
 [dependencies]
-cmark-writer = { version = "0.6.2", features = ["gfm"] }
+cmark-writer = { version = "0.6.3", features = ["gfm"] }
 ```
 
 ## Basic Example

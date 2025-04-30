@@ -10,7 +10,7 @@ To use GFM features, you need to:
 
     ```toml
     [dependencies]
-    cmark-writer = { version = "0.6.2", features = ["gfm"] }
+    cmark-writer = { version = "0.6.3", features = ["gfm"] }
     ```
 
 2. Enable GFM options in your writer:
