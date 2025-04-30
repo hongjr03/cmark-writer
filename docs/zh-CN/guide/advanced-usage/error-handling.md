@@ -68,14 +68,14 @@ cmark-writer 提供了几种定义自己的错误类型的方式：
 
 ### 1. 结构错误
 
-使用 `#[custom_error]` 属性宏定义简单的格式化错误：
+使用 `#[structure_error]` 属性宏定义简单的格式化错误：
 
 ```rust
 use cmark_writer::custom_error;
 use cmark_writer::WriteError;
 
 // 使用格式字符串定义结构错误
-#[custom_error(format = "表格结构错误：{}")]
+#[structure_error(format = "表格结构错误：{}")]
 struct TableStructureError(pub &'static str);
 
 // 使用该错误

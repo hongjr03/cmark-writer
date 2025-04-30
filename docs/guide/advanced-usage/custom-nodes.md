@@ -47,6 +47,26 @@ impl HighlightNode {
 }
 ```
 
+You can also specify whether a node is a block element directly in the attribute:
+
+```rust
+// Define a block-level custom node using the attribute parameter
+#[derive(Debug, Clone, PartialEq)]
+#[custom_node(block=true)]
+struct AlertBoxNode {
+    content: String,
+    level: AlertLevel,
+}
+
+// No need to implement is_block_custom anymore
+impl AlertBoxNode {
+    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        // Implementation...
+        Ok(())
+    }
+}
+```
+
 ### Using Custom Nodes
 
 Once defined, you can use your custom node in documents:
@@ -157,3 +177,69 @@ When creating custom nodes:
 3. **Error Handling**: Use appropriate error handling in your `write_custom` method
 4. **Documentation**: Document your custom nodes thoroughly for users
 5. **Testing**: Write tests to ensure your custom nodes render correctly
+
+## Pattern Matching on Custom Nodes
+
+One challenge with custom nodes is pattern matching, as they are stored behind a trait object (`Box<dyn CustomNode>`). cmark-writer provides convenient helper methods for matching and handling custom node types:
+
+### Using Helper Methods
+
+The `Node` enum provides helper methods for checking and extracting custom node types:
+
+```rust
+// Check if a node is a specific custom type
+if node.is_custom_type::<HighlightNode>() {
+    // Get a reference to the typed node
+    let highlight = node.as_custom_type::<HighlightNode>().unwrap();
+    // Work with the strongly typed node
+    println!("Found highlight with color: {}", highlight.color);
+}
+```
+
+You can also check the type name of a custom node:
+
+```rust
+match node {
+    Node::Custom(custom) => {
+        if HighlightNode::matches(&**custom) {
+            if let Some(highlight) = custom.as_any().downcast_ref::<HighlightNode>() {
+                // Handle HighlightNode
+                println!("Highlight color: {}", highlight.color);
+            }
+        } else if AlertBoxNode::matches(&**custom) {
+            if let Some(alert) = custom.as_any().downcast_ref::<AlertBoxNode>() {
+                // Handle AlertBoxNode
+                println!("Alert level: {:?}", alert.level);
+            }
+        }
+    },
+    _ => {
+        // Handle other node types
+    }
+}
+```
+
+For more elegant matching, you can use `if node.is_custom_type()` as a match guard:
+
+```rust
+match node {
+    Node::Paragraph(p) => {
+        // Handle paragraph
+    },
+    node if node.is_custom_type::<HighlightNode>() => {
+        let highlight = node.as_custom_type::<HighlightNode>().unwrap();
+        // Handle highlight node
+        println!("Highlight color: {}", highlight.color);
+    },
+    node if node.is_custom_type::<AlertBoxNode>() => {
+        let alert = node.as_custom_type::<AlertBoxNode>().unwrap();
+        // Handle alert node
+        println!("Alert level: {:?}", alert.level);
+    },
+    _ => {
+        // Handle other nodes
+    }
+}
+```
+
+These pattern matching utilities make working with custom nodes almost as convenient as working with regular enum variants.

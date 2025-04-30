@@ -68,14 +68,14 @@ cmark-writer provides several ways to define your own error types:
 
 ### 1. Structure Errors
 
-Use the `#[custom_error]` attribute macro for simple formatted errors:
+Use the `#[structure_error]` attribute macro for simple formatted errors:
 
 ```rust
 use cmark_writer::custom_error;
 use cmark_writer::WriteError;
 
 // Define a structure error with format string
-#[custom_error(format = "Table structure error: {}")]
+#[structure_error(format = "Table structure error: {}")]
 struct TableStructureError(pub &'static str);
 
 // Using the error
