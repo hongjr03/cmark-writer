@@ -13,6 +13,7 @@ Here are the key options available for customizing the CommonMark output:
 | `indent_spaces` | `u8` | `4` | Number of spaces for indentation |
 | `list_marker` | `char` | `-` | Marker character for unordered lists |
 | `thematic_break_char` | `char` | `-` | Character for thematic breaks |
+| `escape_special_chars` | `bool` | `false` | Escape special characters in text |
 | `enable_gfm` | `bool` | `false` | Enable GitHub Flavored Markdown |
 | `gfm_tables` | `bool` | `false` | Enable GFM tables |
 | `gfm_tasklists` | `bool` | `false` | Enable GFM task lists |

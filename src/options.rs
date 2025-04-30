@@ -19,6 +19,8 @@ pub struct WriterOptions {
     pub emphasis_char: char,
     /// Character to use for strong emphasis (_, or *)
     pub strong_char: char,
+    /// Whether to escape special characters in text content
+    pub escape_special_chars: bool,
 
     /// Whether to enable GitHub Flavored Markdown (GFM) extensions
     #[cfg(feature = "gfm")]
@@ -55,6 +57,7 @@ impl Default for WriterOptions {
             thematic_break_char: '-',
             emphasis_char: '_',
             strong_char: '*',
+            escape_special_chars: false,
 
             #[cfg(feature = "gfm")]
             enable_gfm: false,
@@ -123,6 +126,12 @@ impl WriterOptionsBuilder {
         if marker == '-' || marker == '+' || marker == '*' {
             self.options.list_marker = marker;
         }
+        self
+    }
+
+    /// Set whether to escape special characters in text content
+    pub fn escape_special_chars(mut self, escape: bool) -> Self {
+        self.options.escape_special_chars = escape;
         self
     }
 

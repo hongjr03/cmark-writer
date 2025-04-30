@@ -15,7 +15,12 @@ fn test_write_text() {
 
 #[test]
 fn test_write_escaped_text() {
-    let mut writer = CommonMarkWriter::new();
+    let mut writer = CommonMarkWriter::with_options(
+        WriterOptionsBuilder::new()
+            .strict(true)
+            .escape_special_chars(true)
+            .build(),
+    );
     let text = Node::Text("Special chars: * _ [ ] < > ` \\".to_string());
     writer.write(&text).unwrap();
     assert_eq!(

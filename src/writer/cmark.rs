@@ -193,17 +193,22 @@ impl CommonMarkWriter {
 
     /// Writes text content with character escaping
     pub(crate) fn write_text_content(&mut self, content: &str) -> WriteResult<()> {
-        let escaped = content
-            .replace('\\', "\\\\")
-            .replace('*', "\\*")
-            .replace('_', "\\_")
-            .replace('[', "\\[")
-            .replace(']', "\\]")
-            .replace('<', "\\<")
-            .replace('>', "\\>")
-            .replace('`', "\\`");
+        if self.options.escape_special_chars {
+            let escaped = content
+                .replace('\\', "\\\\")
+                .replace('*', "\\*")
+                .replace('_', "\\_")
+                .replace('[', "\\[")
+                .replace(']', "\\]")
+                .replace('<', "\\<")
+                .replace('>', "\\>")
+                .replace('`', "\\`");
 
-        self.write_str(&escaped)?;
+            self.write_str(&escaped)?;
+        } else {
+            self.write_str(content)?;
+        }
+
         Ok(())
     }
 

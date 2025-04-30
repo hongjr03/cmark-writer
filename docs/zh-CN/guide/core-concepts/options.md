@@ -13,6 +13,7 @@ cmark-writer 通过 `WriterOptions` 结构体提供了各种选项来自定义�
 | `indent_spaces` | `u8` | `4` | 缩进的空格数量 |
 | `list_marker` | `char` | `-` | 无序列表的标记字符 |
 | `thematic_break_char` | `char` | `-` | 分隔线的字符 |
+| `escape_special_chars` | `bool` | `false` | 转义文本中的特殊字符 |
 | `enable_gfm` | `bool` | `false` | 启用 GitHub Flavored Markdown |
 | `gfm_tables` | `bool` | `false` | 启用 GFM 表格 |
 | `gfm_tasklists` | `bool` | `false` | 启用 GFM 任务列表 |
