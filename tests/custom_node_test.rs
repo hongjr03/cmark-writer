@@ -1,8 +1,8 @@
 #[cfg(feature = "gfm")]
 use cmark_writer::ast::TableAlignment;
 use cmark_writer::coded_error;
-use cmark_writer::structure_error;
 use cmark_writer::custom_node;
+use cmark_writer::structure_error;
 use cmark_writer::CodeBlockType;
 use cmark_writer::CommonMarkWriter;
 use cmark_writer::HeadingType;
