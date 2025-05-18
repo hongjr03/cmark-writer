@@ -1,12 +1,25 @@
 //! Custom node definitions for the CommonMark AST.
 
 use crate::error::WriteResult;
+use crate::writer::{HtmlRenderOptions, HtmlWriteResult};
 use std::any::Any;
 
 /// Trait for implementing custom node behavior
 pub trait CustomNode: std::fmt::Debug + Send + Sync {
-    /// Write the custom node content to the provided writer
+    /// Write the custom node content to the provided writer (for CommonMark output)
     fn write(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()>;
+
+    /// Returns the HTML representation of the custom node as a string, using specified options.
+    ///
+    /// By default, this returns an HTML comment indicating that HTML rendering is not implemented
+    /// for this custom node type.
+    fn to_html_string(&self, options: &HtmlRenderOptions) -> HtmlWriteResult<String> {
+        let _ = options;
+        Ok(format!(
+            "<!-- HTML rendering not implemented for Custom Node: {} -->",
+            self.type_name()
+        ))
+    }
 
     /// Clone the custom node
     fn clone_box(&self) -> Box<dyn CustomNode>;

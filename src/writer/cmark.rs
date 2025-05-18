@@ -9,11 +9,14 @@ use crate::ast::{
 };
 use crate::error::{WriteError, WriteResult};
 use crate::options::WriterOptions;
+use log;
 use std::fmt::{self};
 
 use super::processors::{
     BlockNodeProcessor, CustomNodeProcessor, InlineNodeProcessor, NodeProcessor,
 };
+
+use crate::writer::html;
 
 /// CommonMark writer
 ///
@@ -136,8 +139,8 @@ impl CommonMarkWriter {
         } else if node.is_inline() {
             InlineNodeProcessor.process(self, node)
         } else {
-            // Keep this branch for future implementation needs
-            Err(WriteError::UnsupportedNodeType)
+            log::warn!("Unsupported node type encountered and skipped: {:?}", node);
+            Ok(())
         }
     }
 
@@ -167,7 +170,14 @@ impl CommonMarkWriter {
     /// Check if the inline node contains a newline character and return an error if it does
     pub(crate) fn check_no_newline(&self, node: &Node, context: &str) -> WriteResult<()> {
         if Self::node_contains_newline(node) {
-            return Err(WriteError::NewlineInInlineElement(context.to_string()));
+            if self.is_strict_mode() {
+                return Err(WriteError::NewlineInInlineElement(context.to_string()));
+            } else {
+                log::warn!(
+                    "Newline character found in inline element '{}', but non-strict mode allows it (output may be affected).",
+                    context
+                );
+            }
         }
         Ok(())
     }
@@ -246,13 +256,23 @@ impl CommonMarkWriter {
     /// Write a heading node
     pub(crate) fn write_heading(
         &mut self,
-        level: u8,
+        mut level: u8,
         content: &[Node],
         heading_type: &HeadingType,
     ) -> WriteResult<()> {
         // 验证标题级别
         if level == 0 || level > 6 {
-            return Err(WriteError::InvalidHeadingLevel(level));
+            if self.is_strict_mode() {
+                return Err(WriteError::InvalidHeadingLevel(level));
+            } else {
+                let original_level = level;
+                level = level.clamp(1, 6); // Clamp level to 1-6
+                log::warn!(
+                    "Invalid heading level: {}. Corrected to {}. Strict mode is off.",
+                    original_level,
+                    level
+                );
+            }
         }
 
         match heading_type {
@@ -689,9 +709,17 @@ impl CommonMarkWriter {
     pub(crate) fn write_autolink(&mut self, url: &str, is_email: bool) -> WriteResult<()> {
         // Autolinks shouldn't contain newlines
         if url.contains('\n') {
-            return Err(WriteError::NewlineInInlineElement(
-                "Autolink URL".to_string(),
-            ));
+            if self.is_strict_mode() {
+                return Err(WriteError::NewlineInInlineElement(
+                    "Autolink URL".to_string(),
+                ));
+            } else {
+                log::warn!(
+                    "Newline character found in autolink URL '{}'. Writing it as is, which might result in an invalid link. Strict mode is off.",
+                    url
+                );
+                // Continue to write the URL as is, including the newline.
+            }
         }
 
         // Write the autolink with < and > delimiters
@@ -721,9 +749,18 @@ impl CommonMarkWriter {
 
         // Autolinks shouldn't contain newlines
         if url.contains('\n') {
-            return Err(WriteError::NewlineInInlineElement(
-                "Extended Autolink URL".to_string(),
-            ));
+            if self.is_strict_mode() {
+                // Or a specific gfm_autolinks_strict option if desired
+                return Err(WriteError::NewlineInInlineElement(
+                    "Extended Autolink URL".to_string(),
+                ));
+            } else {
+                log::warn!(
+                    "Newline character found in extended autolink URL '{}'. Writing it as is, which might result in an invalid link. Strict mode is off.",
+                    url
+                );
+                // Continue to write the URL as is, including the newline.
+            }
         }
 
         // Just write the URL as plain text for extended autolinks (no angle brackets)
@@ -801,81 +838,37 @@ impl CommonMarkWriter {
 
     /// Write an HTML element
     pub(crate) fn write_html_element(&mut self, element: &HtmlElement) -> WriteResult<()> {
-        // Check if the HTML element is disallowed in GFM mode
+        let html_render_options = html::HtmlRenderOptions::default();
+
         #[cfg(feature = "gfm")]
-        if self.options.enable_gfm
-            && self
-                .options
-                .gfm_disallowed_html_tags
-                .iter()
-                .any(|tag| tag.eq_ignore_ascii_case(&element.tag))
         {
-            // If the tag is disallowed, write it as escaped text to prevent HTML rendering
-            self.write_str("&lt;")?;
-            self.write_str(&element.tag)?;
-
-            for attr in &element.attributes {
-                self.write_char(' ')?;
-                self.write_str(&attr.name)?;
-                self.write_str("=\"")?;
-                self.write_str(&escape_attribute_value(&attr.value))?;
-                self.write_char('"')?;
-            }
-
-            if element.self_closing {
-                self.write_str(" /&gt;")?;
-                return Ok(());
-            }
-
-            self.write_str("&gt;")?;
-
-            for child in &element.children {
-                self.write(child)?;
-            }
-
-            self.write_str("&lt;/")?;
-            self.write_str(&element.tag)?;
-            self.write_str("&gt;")?;
-            return Ok(());
+            html_render_options.enable_gfm = self.options.enable_gfm;
+            html_render_options.gfm_disallowed_html_tags =
+                self.options.gfm_disallowed_html_tags.clone();
         }
 
-        // 检查标签名是否包含潜在危险字符
-        if !is_safe_tag_name(&element.tag) {
-            return Err(WriteError::InvalidHtmlTag(element.tag.clone()));
-        }
+        // code_block_language_class_prefix from HtmlRenderOptions::default() is used.
 
-        // Normal HTML element rendering if not disallowed or if GFM mode is not enabled
-        self.write_char('<')?;
-        self.write_str(&element.tag)?;
+        let mut html_output_buffer = Vec::new();
+        let mut temp_html_writer =
+            html::HtmlWriter::new(std::io::Cursor::new(&mut html_output_buffer));
+        let node_to_render = Node::HtmlElement(element.clone());
 
-        for attr in &element.attributes {
-            // 检查属性名是否安全
-            if !is_safe_attribute_name(&attr.name) {
-                return Err(WriteError::InvalidHtmlAttribute(attr.name.clone()));
-            }
+        temp_html_writer.write_node(&node_to_render, &html_render_options)?;
+        temp_html_writer
+            .flush()
+            .map_err(html::error::HtmlWriteError::Io)?;
 
-            self.write_char(' ')?;
-            self.write_str(&attr.name)?;
-            self.write_str("=\"")?;
-            self.write_str(&escape_attribute_value(&attr.value))?;
-            self.write_char('"')?;
-        }
+        let html_string =
+            String::from_utf8(html_output_buffer).map_err(|utf8_err| WriteError::Custom {
+                message: format!(
+                    "HTML output from HtmlWriter was not valid UTF-8: {}",
+                    utf8_err
+                ),
+                code: None,
+            })?;
 
-        if element.self_closing {
-            self.write_str(" />")?;
-            return Ok(());
-        }
-
-        self.write_char('>')?;
-
-        for child in &element.children {
-            // HTML element content can contain newlines, so no strict check here
-            self.write(child)?;
-        }
-
-        self.write_str("</")?;
-        self.write_str(&element.tag)?;
-        self.write_char('>')?;
+        self.buffer.push_str(&html_string);
         Ok(())
     }
 
@@ -964,37 +957,4 @@ impl CustomNodeWriter for CommonMarkWriter {
         self.buffer.push(c);
         Ok(())
     }
-}
-// Helper functions for HTML safety
-
-/// Check if an HTML tag name is safe
-///
-/// Tag names should only contain letters, numbers, underscores, colons, and hyphens
-fn is_safe_tag_name(tag: &str) -> bool {
-    !tag.is_empty()
-        && tag
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-')
-}
-
-/// Check if an HTML attribute name is safe
-///
-/// Attribute names should only contain letters, numbers, underscores, colons, dots, and hyphens
-fn is_safe_attribute_name(name: &str) -> bool {
-    !name.is_empty()
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-' || c == '.')
-}
-
-/// Escape special characters in HTML attribute values
-///
-/// Converts quotes, less-than signs, greater-than signs, and other special characters to HTML entities
-fn escape_attribute_value(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
 }
