@@ -12,6 +12,8 @@ readme = "README.md"
 
 [dependencies]
 cmark-writer-macros = { path = "./cmark-writer-macros", version = "0.6.3" }
+env_logger = "0.11.8"
+log = "0.4.27"
 
 [features]
 default = []

@@ -3,11 +3,13 @@
 //! This module provides error types and implementations for handling errors
 //! that can occur during CommonMark writing.
 
+use crate::writer::html::error::HtmlWriteError as CoreHtmlWriteError;
 use std::error::Error;
 use std::fmt::{self, Display};
+use std::io;
 
 /// Errors that can occur during CommonMark writing.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum WriteError {
     /// An invalid heading level was encountered (must be 1-6).
     InvalidHeadingLevel(u8),
@@ -15,6 +17,8 @@ pub enum WriteError {
     NewlineInInlineElement(String),
     /// An underlying formatting error occurred.
     FmtError(String),
+    /// An underlying I/O error occurred.
+    IoError(io::Error),
     /// An unsupported node type was encountered.
     UnsupportedNodeType,
     /// Invalid structure in a node (e.g., mismatched table columns)
@@ -23,6 +27,8 @@ pub enum WriteError {
     InvalidHtmlTag(String),
     /// An invalid HTML attribute was found (contains unsafe characters)
     InvalidHtmlAttribute(String),
+    /// An error occurred during dedicated HTML rendering.
+    HtmlRenderingError(CoreHtmlWriteError),
     /// A custom error with a message and optional error code.
     Custom {
         /// Custom error message
@@ -46,6 +52,7 @@ impl Display for WriteError {
                 context
             ),
             WriteError::FmtError(msg) => write!(f, "Formatting error: {}", msg),
+            WriteError::IoError(err) => write!(f, "I/O error: {}", err),
             WriteError::UnsupportedNodeType => {
                 write!(f, "Unsupported node type encountered during writing.")
             },
@@ -57,6 +64,9 @@ impl Display for WriteError {
             },
             WriteError::InvalidHtmlAttribute(attr) => {
                 write!(f, "Invalid HTML attribute name: '{}'. Attribute names should only contain alphanumeric characters, underscores, colons, dots, or hyphens.", attr)
+            },
+            WriteError::HtmlRenderingError(html_err) => {
+                write!(f, "Error during HTML rendering phase: {}", html_err)
             },
             WriteError::Custom { message, code } => {
                 if let Some(code) = code {
@@ -75,6 +85,26 @@ impl Error for WriteError {}
 impl From<fmt::Error> for WriteError {
     fn from(err: fmt::Error) -> Self {
         WriteError::FmtError(err.to_string())
+    }
+}
+
+// Allow converting io::Error into WriteError
+impl From<io::Error> for WriteError {
+    fn from(err: io::Error) -> Self {
+        WriteError::IoError(err)
+    }
+}
+
+// Allow converting CoreHtmlWriteError into WriteError
+impl From<CoreHtmlWriteError> for WriteError {
+    fn from(err: CoreHtmlWriteError) -> Self {
+        match err {
+            CoreHtmlWriteError::InvalidHtmlTag(tag) => WriteError::InvalidHtmlTag(tag),
+            CoreHtmlWriteError::InvalidHtmlAttribute(attr) => {
+                WriteError::InvalidHtmlAttribute(attr)
+            }
+            other_html_err => WriteError::HtmlRenderingError(other_html_err),
+        }
     }
 }
 

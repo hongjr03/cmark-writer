@@ -5,6 +5,7 @@ use cmark_writer::CommonMarkWriter;
 use cmark_writer::Node;
 use cmark_writer::WriteError;
 use cmark_writer::WriteResult;
+use cmark_writer::WriterOptions;
 use std::fmt::{self, Display};
 
 #[test]
@@ -282,3 +283,135 @@ fn test_mixed_order_custom_errors() {
         "Invalid structure: 渲染错误：无法渲染表格"
     );
 }
+
+// Helper to initialize logger for tests.
+// Call this at the beginning of each test or in a common setup function if needed.
+fn init_logger() {
+    // Using try_init() to avoid panic if logger is already initialized,
+    // which can happen if tests are run in parallel or multiple times.
+    let _ = env_logger::builder().is_test(true).try_init();
+}
+
+#[test]
+fn test_invalid_heading_level_strict() {
+    init_logger();
+    let options = WriterOptions {
+        strict: true,
+        ..Default::default()
+    };
+    let mut writer = CommonMarkWriter::with_options(options);
+    let node = Node::Heading {
+        level: 0, // Invalid level
+        content: vec![Node::Text("Test".to_string())],
+        heading_type: HeadingType::Atx,
+    };
+    match writer.write(&node) {
+        Err(WriteError::InvalidHeadingLevel(level)) => assert_eq!(level, 0),
+        _ => panic!("Expected InvalidHeadingLevel error"),
+    }
+}
+
+#[test]
+fn test_invalid_heading_level_non_strict() {
+    init_logger();
+    let options = WriterOptions {
+        strict: false,
+        ..Default::default()
+    };
+    let mut writer = CommonMarkWriter::with_options(options);
+    let node = Node::Heading {
+        level: 0, // Invalid level
+        content: vec![Node::Text("Test".to_string())],
+        heading_type: HeadingType::Atx,
+    };
+    assert!(writer.write(&node).is_ok());
+    // In non-strict, level 0 should be clamped to 1.
+    assert_eq!(writer.into_string(), "# Test\n");
+    // Manually check stderr for log: "Invalid heading level: 0. Corrected to 1..."
+}
+
+#[test]
+fn test_invalid_heading_level_7_non_strict() {
+    init_logger();
+    let options = WriterOptions {
+        strict: false,
+        ..Default::default()
+    };
+    let mut writer = CommonMarkWriter::with_options(options);
+    let node = Node::Heading {
+        level: 7, // Invalid level
+        content: vec![Node::Text("Test".to_string())],
+        heading_type: HeadingType::Atx,
+    };
+    assert!(writer.write(&node).is_ok());
+    // In non-strict, level 7 should be clamped to 6.
+    assert_eq!(writer.into_string(), "###### Test\n");
+    // Manually check stderr for log: "Invalid heading level: 7. Corrected to 6..."
+}
+
+#[test]
+fn test_newline_in_link_text_strict() {
+    init_logger();
+    let options = WriterOptions {
+        strict: true,
+        ..Default::default()
+    };
+    let mut writer = CommonMarkWriter::with_options(options);
+    let node = Node::Link {
+        url: "http://example.com".to_string(),
+        title: None,
+        content: vec![Node::Text("Link\nText".to_string())], // Newline in link text
+    };
+    match writer.write(&node) {
+        Err(WriteError::NewlineInInlineElement(context)) => assert_eq!(context, "Link content"),
+        _ => panic!("Expected NewlineInInlineElement error for link text"),
+    }
+}
+
+#[test]
+fn test_newline_in_link_text_non_strict() {
+    init_logger();
+    let options = WriterOptions {
+        strict: false,
+        ..Default::default()
+    };
+    let mut writer = CommonMarkWriter::with_options(options);
+    let node = Node::Link {
+        url: "http://example.com".to_string(),
+        title: None,
+        content: vec![Node::Text("Link\nText".to_string())], // Newline in link text
+    };
+    assert!(writer.write(&node).is_ok());
+    // Output will contain the newline as per current non-strict behavior
+    assert_eq!(writer.into_string(), "[Link\nText](http://example.com)");
+    // Manually check stderr for log: "Newline character found in inline element 'Link Text'..."
+}
+
+// TODO: Add test for UnsupportedNodeType if a stable way to construct/mock one exists.
+// For example, if Node enum had a test-only variant:
+// #[cfg(test)]
+// TestOnlyUnsupported,
+//
+// Then you could write:
+// #[test]
+// fn test_unsupported_node_type_strict() {
+//     init_logger();
+//     let options = WriterOptions { strict: true, ..Default::default() };
+//     let mut writer = CommonMarkWriter::with_options(options);
+//     let node = Node::TestOnlyUnsupported; // Hypothetical
+//     match writer.write(&node) {
+//         Err(WriteError::UnsupportedNodeType) => { /* Expected */ }
+//         _ => panic!("Expected UnsupportedNodeType error"),
+//     }
+// }
+//
+// #[test]
+// fn test_unsupported_node_type_non_strict() {
+//     init_logger();
+//     let options = WriterOptions { strict: false, ..Default::default() };
+//     let mut writer = CommonMarkWriter::with_options(options);
+//     let node = Node::TestOnlyUnsupported; // Hypothetical
+//     assert!(writer.write(&node).is_ok());
+//     assert_eq!(writer.into_string(), ""); // Or placeholder if you decide to write one
+//     // Manually check stderr for log: "Unsupported node type encountered and skipped..."
+// }
