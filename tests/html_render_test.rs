@@ -4,7 +4,49 @@ mod tests {
     #[cfg(feature = "gfm")]
     use cmark_writer::ast::{TableAlignment, TaskListStatus};
     use cmark_writer::writer::{HtmlRenderOptions, HtmlWriteResult, HtmlWriter};
+    use log::{LevelFilter, Log};
     use std::io::Cursor;
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+
+    fn setup_logger() {
+        INIT.call_once(|| {
+            struct TestLogger;
+            impl Log for TestLogger {
+                fn enabled(&self, metadata: &log::Metadata) -> bool {
+                    metadata.level() <= LevelFilter::Warn
+                }
+
+                fn log(&self, record: &log::Record) {
+                    if self.enabled(record.metadata()) {
+                        let color_code = match record.level() {
+                            log::Level::Error => "\x1b[31m", // 红色
+                            log::Level::Warn => "\x1b[33m",  // 黄色
+                            log::Level::Info => "\x1b[32m",  // 绿色
+                            log::Level::Debug => "\x1b[34m", // 蓝色
+                            log::Level::Trace => "\x1b[90m", // 灰色
+                        };
+                        let reset = "\x1b[0m";
+                        println!(
+                            "{}[{}]{} {}: {}",
+                            color_code,
+                            record.level(),
+                            reset,
+                            record.target(),
+                            record.args()
+                        );
+                    }
+                }
+
+                fn flush(&self) {}
+            }
+
+            log::set_boxed_logger(Box::new(TestLogger))
+                .map(|()| log::set_max_level(LevelFilter::Warn))
+                .expect("Failed to initialize logger");
+        });
+    }
 
     // Helper function to render a node to string with given options
     fn render_node_to_html(node: &Node, options: &HtmlRenderOptions) -> HtmlWriteResult<String> {
@@ -383,5 +425,109 @@ mod tests {
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
-    // TODO: Add tests for CustomNode output
+    #[test]
+    fn test_warning_output() {
+        setup_logger();
+
+        // 测试无效的 HTML 标签
+        let element = HtmlElement {
+            tag: "invalid<tag>".to_string(),
+            attributes: vec![],
+            children: vec![Node::Text("Content".to_string())],
+            self_closing: false,
+        };
+        let node = Node::HtmlElement(element);
+        let options = HtmlRenderOptions {
+            strict: false,
+            ..HtmlRenderOptions::default()
+        };
+
+        // HTML 输出应该不受警告影响
+        let expected_html = "&lt;invalid&lt;tag&gt;&gt;Content&lt;/invalid&lt;tag&gt;&gt;";
+        let actual_html = render_node_to_html(&node, &options).unwrap();
+        assert_eq!(actual_html, expected_html);
+
+        // 警告信息应该只输出到控制台，不影响 HTML 输出
+        // 注意：这个测试主要验证 HTML 输出是否正确，警告信息会在控制台看到
+    }
+
+    #[test]
+    fn test_invalid_html_attribute_non_strict() {
+        let element = HtmlElement {
+            tag: "div".to_string(),
+            attributes: vec![cmark_writer::ast::HtmlAttribute {
+                name: "invalid<attr>".to_string(),
+                value: "value".to_string(),
+            }],
+            children: vec![Node::Text("Content".to_string())],
+            self_closing: false,
+        };
+        let node = Node::HtmlElement(element);
+        let options = HtmlRenderOptions {
+            strict: false,
+            ..HtmlRenderOptions::default()
+        };
+        let expected_html = "<div> invalid&lt;attr&gt;=&quot;value&quot;Content</div>";
+        assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
+    }
+
+    #[cfg(feature = "gfm")]
+    #[test]
+    fn test_disallowed_html_tag_gfm() {
+        let element = HtmlElement {
+            tag: "script".to_string(),
+            attributes: vec![],
+            children: vec![Node::Text("alert('test')".to_string())],
+            self_closing: false,
+        };
+        let node = Node::HtmlElement(element);
+        let options = HtmlRenderOptions {
+            enable_gfm: true,
+            ..HtmlRenderOptions::default()
+        };
+        let expected_html = "<script>alert(&#39;test&#39;)</script>";
+        assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
+    }
+
+    #[test]
+    fn test_reference_link_warning() {
+        let node = Node::ReferenceLink {
+            label: "unresolved".to_string(),
+            content: vec![Node::Text("Unresolved Link".to_string())],
+        };
+        let options = HtmlRenderOptions {
+            strict: false,
+            ..HtmlRenderOptions::default()
+        };
+        let expected_html = "[Unresolved Link][unresolved]";
+        assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
+    }
+
+    #[cfg(feature = "gfm")]
+    #[test]
+    fn test_gfm_warning_output() {
+        setup_logger();
+
+        // 测试 GFM 模式下被禁用的 HTML 标签
+        let element = HtmlElement {
+            tag: "script".to_string(),
+            attributes: vec![],
+            children: vec![Node::Text("alert('test')".to_string())],
+            self_closing: false,
+        };
+        let node = Node::HtmlElement(element);
+        let options = HtmlRenderOptions {
+            enable_gfm: true,
+            gfm_disallowed_html_tags: vec!["script".to_string()],
+            ..HtmlRenderOptions::default()
+        };
+
+        // HTML 输出应该不受警告影响
+        let expected_html = "&lt;script&gt;alert(&#39;test&#39;)&lt;/script&gt;";
+        let actual_html = render_node_to_html(&node, &options).unwrap();
+        assert_eq!(actual_html, expected_html);
+
+        // 警告信息应该只输出到控制台，不影响 HTML 输出
+        // 注意：这个测试主要验证 HTML 输出是否正确，警告信息会在控制台看到
+    }
 }
