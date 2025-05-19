@@ -2,6 +2,12 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.2] - 2025-05-19
+
+### Bug Fixes
+
+- Fixed wrong behavior of HTML self-closing tag writing.
+
 ## [0.7.1] - 2025-05-19
 
 ### Changes
