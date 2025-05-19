@@ -2,6 +2,12 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.3] - 2025-05-19
+
+### Changes
+
+- Refactored HtmlElement writing logic to delegate to HtmlWriter.
+
 ## [0.7.2] - 2025-05-19
 
 ### Bug Fixes
