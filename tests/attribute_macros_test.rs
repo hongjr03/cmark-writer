@@ -1,20 +1,21 @@
+// 移除未使用的导入
 use cmark_writer::ast::HeadingType;
 use cmark_writer::coded_error;
 use cmark_writer::custom_node;
 use cmark_writer::structure_error;
 use cmark_writer::CommonMarkWriter;
+use cmark_writer::Node;
 use cmark_writer::WriteResult;
-use cmark_writer::{CustomNodeWriter, Node};
 
 // 使用属性宏定义自定义错误
 #[structure_error(format = "表格行列不匹配：{}")]
-pub struct TableRowColumnMismatchError(pub &'static str);
+struct TableRowColumnMismatchError(pub &'static str);
 
 #[structure_error(format = "表格空表头：{}")]
-pub struct TableEmptyHeaderError(pub &'static str);
+struct TableEmptyHeaderError(pub &'static str);
 
 #[coded_error]
-pub struct TableAlignmentError(pub String, pub String);
+struct TableAlignmentError(pub String, pub String);
 
 // 一个简单的自定义节点示例：表示高亮文本
 #[derive(Debug, PartialEq, Clone)]
@@ -26,7 +27,7 @@ struct HighlightNode {
 
 // 实现 HighlightNode 所需的方法
 impl HighlightNode {
-    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         // 实现自定义写入逻辑
         writer.write_str("<span style=\"background-color: ")?;
         writer.write_str(&self.color)?;
@@ -52,7 +53,7 @@ struct CalloutNode {
 
 // 实现 CalloutNode 所需的方法
 impl CalloutNode {
-    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         writer.write_str("<div class=\"callout callout-")?;
         writer.write_str(&self.style)?;
         writer.write_str("\">\n")?;

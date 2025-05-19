@@ -9,4 +9,4 @@ pub use self::cmark::CommonMarkWriter;
 
 /// HTML specific modules are now grouped under writer::html
 pub mod html;
-pub use self::html::{HtmlRenderOptions, HtmlWriteError, HtmlWriteResult, HtmlWriter};
+pub use self::html::{HtmlWriteError, HtmlWriteResult, HtmlWriter, HtmlWriterOptions};

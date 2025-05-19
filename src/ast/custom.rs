@@ -1,24 +1,80 @@
 //! Custom node definitions for the CommonMark AST.
 
 use crate::error::WriteResult;
-use crate::writer::{HtmlRenderOptions, HtmlWriteResult};
+use crate::writer::{CommonMarkWriter, HtmlWriteResult, HtmlWriter};
 use std::any::Any;
 
-/// Trait for implementing custom node behavior
+/// Trait for implementing custom node behavior for the CommonMark AST.
+///
+/// This trait defines methods that all custom node types must implement.
+/// Users can implement the `write` method for CommonMark output and
+/// optionally override the `html_write` method for HTML output.
+///
+/// The recommended way to implement this trait is through the `custom_node` macro,
+/// which provides a default implementation of most methods and requires users to
+/// implement only the node-specific logic.
+///
+/// # Example
+///
+/// ```rust
+/// use cmark_writer_macros::custom_node;
+/// use cmark_writer::CommonMarkWriter;
+/// use cmark_writer::writer::HtmlWriter;
+/// use cmark_writer::error::WriteResult;
+/// use cmark_writer::writer::HtmlWriteResult;
+///
+/// // Define a custom node with support for both CommonMark and HTML output
+/// #[derive(Debug, Clone, PartialEq)]
+/// #[custom_node(block=false, html_impl=true)]
+/// struct HighlightNode {
+///     content: String,
+///     color: String,
+/// }
+///
+/// impl HighlightNode {
+///     // Required for CommonMark output
+///     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+///         writer.write_str("<span style=\"background-color: ")?;
+///         writer.write_str(&self.color)?;
+///         writer.write_str("\">")?;
+///         writer.write_str(&self.content)?;
+///         writer.write_str("</span>")?;
+///         Ok(())
+///     }
+///
+///     // Optional HTML-specific implementation
+///     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+///         writer.start_tag("span")?;
+///         writer.attribute("style", &format!("background-color: {}", self.color))?;
+///         writer.finish_tag()?;
+///         writer.text(&self.content)?;
+///         writer.end_tag("span")?;
+///         Ok(())
+///     }
+/// }
+/// ```
 pub trait CustomNode: std::fmt::Debug + Send + Sync {
-    /// Write the custom node content to the provided writer (for CommonMark output)
-    fn write(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()>;
-
-    /// Returns the HTML representation of the custom node as a string, using specified options.
+    /// Write the custom node content to the CommonMarkWriter (for CommonMark output).
     ///
-    /// By default, this returns an HTML comment indicating that HTML rendering is not implemented
-    /// for this custom node type.
-    fn to_html_string(&self, options: &HtmlRenderOptions) -> HtmlWriteResult<String> {
-        let _ = options;
-        Ok(format!(
+    /// When using the `custom_node` macro, this method delegates to the user-defined
+    /// `write_custom` method that must be implemented on the node type.
+    fn write(&self, writer: &mut CommonMarkWriter) -> WriteResult<()>;
+
+    /// Writes the HTML representation of the custom node to the provided HTML writer.
+    ///
+    /// By default, this writes an HTML comment indicating that HTML rendering is not implemented
+    /// for this custom node type. When using the `custom_node` macro with `html_impl=true`,
+    /// this method delegates to the user-defined `write_html_custom` method.
+    ///
+    /// Users should either:
+    /// 1. Override this method directly, or
+    /// 2. Use the `custom_node` macro with `html_impl=true` and implement the `write_html_custom` method.
+    fn html_write(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+        writer.raw_html(&format!(
             "<!-- HTML rendering not implemented for Custom Node: {} -->",
             self.type_name()
-        ))
+        ))?;
+        Ok(())
     }
 
     /// Clone the custom node
@@ -42,6 +98,9 @@ pub trait CustomNode: std::fmt::Debug + Send + Sync {
     }
 }
 
+// NOTE: CustomNodeWriter trait is deprecated and will be removed in a future version.
+// Custom nodes should now directly use CommonMarkWriter instead.
+/*
 /// Trait for custom node writer implementation
 pub trait CustomNodeWriter {
     /// Write a string to the output
@@ -50,6 +109,7 @@ pub trait CustomNodeWriter {
     /// Write a character to the output
     fn write_char(&mut self, c: char) -> std::fmt::Result;
 }
+*/
 
 // Implement Clone for Box<dyn CustomNode>
 impl Clone for Box<dyn CustomNode> {

@@ -87,22 +87,51 @@ GFM Support:
 - Extended autolinks
 - HTML element filtering
 
+## HTML Writing
+
+The library provides dedicated HTML writing capabilities through the `HtmlWriter` class:
+
+```rust
+use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node};
+
+// Create HTML writer with custom options
+let options = HtmlWriterOptions {
+    strict: true,
+    code_block_language_class_prefix: Some("language-".to_string()),
+    #[cfg(feature = "gfm")]
+    enable_gfm: true,
+    #[cfg(feature = "gfm")]
+    gfm_disallowed_html_tags: vec!["script".to_string()],
+};
+
+let mut writer = HtmlWriter::with_options(options);
+
+// Write some nodes
+let paragraph = Node::Paragraph(vec![Node::Text("Hello HTML".to_string())]);
+writer.write_node(&paragraph).unwrap();
+
+// Get resulting HTML
+let html = writer.into_string();
+assert_eq!(html, "<p>Hello HTML</p>\n");
+```
+
 ## Custom Nodes
 
 ```rust
-use cmark_writer::ast::{CustomNodeWriter, Node};
-use cmark_writer::error::WriteResult;
+use cmark_writer::{CommonMarkWriter, HtmlWriter, HtmlWriteResult, Node};
+use cmark_writer::WriteResult;
 use cmark_writer::custom_node;
 
 #[derive(Debug, Clone, PartialEq)]
-#[custom_node]
+#[custom_node(block=false, html_impl=true)]
 struct HighlightNode {
     content: String,
     color: String,
 }
 
 impl HighlightNode {
-    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+    // Implementation for CommonMark output
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         writer.write_str("<span style=\"background-color: ")?;
         writer.write_str(&self.color)?;
         writer.write_str("\">")?;
@@ -111,8 +140,14 @@ impl HighlightNode {
         Ok(())
     }
     
-    fn is_block_custom(&self) -> bool {
-        false
+    // Optional HTML-specific implementation
+    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+        writer.start_tag("span")?;
+        writer.attribute("style", &format!("background-color: {}", self.color))?;
+        writer.finish_tag()?;
+        writer.text(&self.content)?;
+        writer.end_tag("span")?;
+        Ok(())
     }
 }
 ```

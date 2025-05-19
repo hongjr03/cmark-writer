@@ -1,9 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use cmark_writer::{
-        ast::{CustomNodeWriter, Node},
-        error::WriteResult,
-    };
+    use cmark_writer::{ast::Node, error::WriteResult, CommonMarkWriter};
     use cmark_writer_macros::custom_node;
 
     // 使用 block=false 指定为行内元素
@@ -15,7 +12,7 @@ mod tests {
     }
 
     impl ColoredTextNode {
-        fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
             writer.write_str("<span style=\"color: ")?;
             writer.write_str(&self.color)?;
             writer.write_str("\">")?;
@@ -42,7 +39,7 @@ mod tests {
     }
 
     impl AlertBoxNode {
-        fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
             let class = match self.level {
                 AlertLevel::Info => "info",
                 AlertLevel::Warning => "warning",

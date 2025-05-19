@@ -3,11 +3,12 @@ use cmark_writer::ast::TableAlignment;
 use cmark_writer::coded_error;
 use cmark_writer::custom_node;
 use cmark_writer::structure_error;
+use cmark_writer::writer::HtmlWriter;
 use cmark_writer::CodeBlockType;
 use cmark_writer::CommonMarkWriter;
 use cmark_writer::HeadingType;
+use cmark_writer::Node;
 use cmark_writer::WriteResult;
-use cmark_writer::{CustomNodeWriter, Node};
 
 // 使用属性宏定义自定义错误
 #[structure_error(format = "表格行列不匹配：{}")]
@@ -21,7 +22,7 @@ struct TableAlignmentError(pub String, pub String);
 
 // A simple custom node example: representing highlighted text
 #[derive(Debug, PartialEq, Clone)]
-#[custom_node]
+#[custom_node(block = false)]
 struct HighlightNode {
     content: String,
     color: String,
@@ -29,7 +30,8 @@ struct HighlightNode {
 
 // Implementing required methods for HighlightNode
 impl HighlightNode {
-    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+    // For CommonMark output
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         // Implement custom writing logic
         writer.write_str("<span style=\"background-color: ")?;
         writer.write_str(&self.color)?;
@@ -39,14 +41,24 @@ impl HighlightNode {
         Ok(())
     }
 
-    fn is_block_custom(&self) -> bool {
-        false // This is an inline element
+    // For HTML output - optimized HTML implementation
+    #[allow(dead_code)]
+    fn write_html_custom(
+        &self,
+        writer: &mut cmark_writer::writer::HtmlWriter,
+    ) -> cmark_writer::writer::HtmlWriteResult<()> {
+        writer.start_tag("span")?;
+        writer.attribute("style", &format!("background-color: {}", self.color))?;
+        writer.finish_tag()?;
+        writer.text(&self.content)?;
+        writer.end_tag("span")?;
+        Ok(())
     }
 }
 
 // Example of a custom block-level node implementation
 #[derive(Debug, PartialEq, Clone)]
-#[custom_node]
+#[custom_node(block = true)]
 struct CalloutNode {
     title: String,
     content: String,
@@ -55,7 +67,8 @@ struct CalloutNode {
 
 // Implementing required methods for CalloutNode
 impl CalloutNode {
-    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+    // CommonMark output implementation
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         writer.write_str("<div class=\"callout callout-")?;
         writer.write_str(&self.style)?;
         writer.write_str("\">\n")?;
@@ -72,8 +85,28 @@ impl CalloutNode {
         Ok(())
     }
 
-    fn is_block_custom(&self) -> bool {
-        true // This is a block-level element
+    // HTML-specific implementation
+    #[allow(dead_code)]
+    fn write_html_custom(
+        &self,
+        writer: &mut HtmlWriter,
+    ) -> cmark_writer::writer::HtmlWriteResult<()> {
+        writer.start_tag("div")?;
+        writer.attribute("class", &format!("callout callout-{}", self.style))?;
+        writer.finish_tag()?;
+
+        writer.start_tag("h4")?;
+        writer.finish_tag()?;
+        writer.text(&self.title)?;
+        writer.end_tag("h4")?;
+
+        writer.start_tag("p")?;
+        writer.finish_tag()?;
+        writer.text(&self.content)?;
+        writer.end_tag("p")?;
+
+        writer.end_tag("div")?;
+        Ok(())
     }
 }
 
@@ -152,7 +185,7 @@ fn test_custom_block_in_document() {
 /// and has a caption. This allows for advanced document structures like
 /// figures with numbered captions, images with descriptions, etc.
 #[derive(Debug, PartialEq, Clone)]
-#[custom_node]
+#[custom_node(block = true)]
 struct FigureNode {
     /// The main content of the figure, can be any block node
     body: Box<Node>,
@@ -164,7 +197,7 @@ struct FigureNode {
 
 impl FigureNode {
     // Helper method to write a node to the provided writer
-    fn write_node(&self, node: &Node, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+    fn write_node(&self, node: &Node, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         // We need to use a temporary CommonMarkWriter to render the node
         let mut temp_writer = CommonMarkWriter::new();
         temp_writer.write(node)?;
@@ -173,7 +206,7 @@ impl FigureNode {
         Ok(())
     }
 
-    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         // Start the figure element with optional ID
         writer.write_str("<figure")?;
         if let Some(id) = &self.id {
@@ -186,7 +219,7 @@ impl FigureNode {
         // Create a temporary CommonMarkWriter to render the body node
         let mut body_writer = CommonMarkWriter::new();
         // We need to downcast to access the write method
-        let body_writer_ptr: &mut dyn CustomNodeWriter = &mut body_writer;
+        let body_writer_ptr: &mut CommonMarkWriter = &mut body_writer;
 
         // Render the body content using its native renderer
         // This allows any block node to be properly rendered inside the figure
@@ -220,10 +253,6 @@ impl FigureNode {
         writer.write_str("</figure>")?;
 
         Ok(())
-    }
-
-    fn is_block_custom(&self) -> bool {
-        true // Figure is always a block-level element
     }
 }
 
@@ -354,7 +383,7 @@ fn test_custom_node_attribute() {
 
     // Implement the required methods for AlertBox
     impl AlertBox {
-        fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
             writer.write_str("<div class=\"alert alert-")?;
             writer.write_str(&self.level)?;
             writer.write_str("\">\n")?;
@@ -423,7 +452,7 @@ struct AlignedTableNode {
 }
 
 impl AlignedTableNode {
-    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         if self.rows.iter().any(|row| row.len() != self.headers.len()) {
             return Err(TableRowColumnMismatchError("表格行单元格数与表头数不匹配").into_error());
         }

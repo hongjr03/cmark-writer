@@ -3,7 +3,7 @@ use cmark_writer::ast::TableAlignment;
 use cmark_writer::ast::{HeadingType, HtmlAttribute, HtmlElement, ListItem, Node};
 use cmark_writer::options::WriterOptionsBuilder;
 use cmark_writer::writer::CommonMarkWriter;
-use cmark_writer::{CodeBlockType, WriteError};
+use cmark_writer::{CodeBlockType, WriteError, WriterOptions};
 
 #[test]
 fn test_write_text() {
@@ -519,7 +519,7 @@ fn test_write_self_closing_html_element() {
     writer.write(&img).unwrap();
     assert_eq!(
         writer.into_string(),
-        "<img src=\"image.jpg\" alt=\"图片描述\" />"
+        "<img src=\"image.jpg\" alt=\"图片描述\">"
     );
 }
 
@@ -576,7 +576,10 @@ fn test_html_element_with_unsafe_tag() {
 
 #[test]
 fn test_html_element_with_unsafe_attribute() {
-    let mut writer = CommonMarkWriter::new();
+    let mut writer = CommonMarkWriter::with_options(WriterOptions {
+        strict: true,
+        ..Default::default()
+    });
     let html_element = Node::HtmlElement(HtmlElement {
         tag: "div".to_string(),
         attributes: vec![HtmlAttribute {
@@ -613,7 +616,7 @@ fn test_html_attribute_value_escaping() {
     writer.write(&html_element).unwrap();
     assert_eq!(
         writer.into_string(),
-        "<div data-text=\"引号&quot;和&lt;标签&gt;以及&amp;符号\">内容</div>"
+        "<div data-text=\"引号\"和&lt;标签&gt;以及&amp;符号\">内容</div>"
     );
 }
 

@@ -10,5 +10,5 @@ pub mod utils;
 pub mod writer;
 
 pub use self::error::{HtmlWriteError, HtmlWriteResult};
-pub use self::options::HtmlRenderOptions;
+pub use self::options::HtmlWriterOptions;
 pub use self::writer::HtmlWriter;

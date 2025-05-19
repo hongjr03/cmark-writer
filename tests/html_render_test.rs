@@ -3,9 +3,9 @@ mod tests {
     use cmark_writer::ast::{HtmlElement, ListItem, Node};
     #[cfg(feature = "gfm")]
     use cmark_writer::ast::{TableAlignment, TaskListStatus};
-    use cmark_writer::writer::{HtmlRenderOptions, HtmlWriteResult, HtmlWriter};
+    use cmark_writer::writer::{HtmlWriteResult, HtmlWriter, HtmlWriterOptions};
     use log::{LevelFilter, Log};
-    use std::io::Cursor;
+
     use std::sync::Once;
 
     static INIT: Once = Once::new();
@@ -49,30 +49,38 @@ mod tests {
     }
 
     // Helper function to render a node to string with given options
-    fn render_node_to_html(node: &Node, options: &HtmlRenderOptions) -> HtmlWriteResult<String> {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-        html_writer.write_node(node, options)?;
-        html_writer.flush()?;
-        Ok(String::from_utf8(buffer.into_inner()).unwrap())
+    fn render_node_to_html(node: &Node, options: &HtmlWriterOptions) -> HtmlWriteResult<String> {
+        // Create HtmlWriter with the provided options
+        let mut html_writer = HtmlWriter::with_options(options.clone());
+        // Write the node to the writer
+        html_writer.write_node(node)?;
+        // Convert the writer to a string and return it
+        let html = html_writer.into_string();
+        Ok(html)
     }
 
     // Helper function to render a node to string with default options
     fn render_node_to_html_default(node: &Node) -> HtmlWriteResult<String> {
-        render_node_to_html(node, &HtmlRenderOptions::default())
+        render_node_to_html(
+            node,
+            #[cfg(feature = "gfm")]
+            &HtmlWriterOptions::default().enable_gfm(true),
+            #[cfg(not(feature = "gfm"))]
+            &HtmlWriterOptions::default(),
+        )
     }
 
     #[test]
     fn test_paragraph_and_text() {
         let node = Node::Paragraph(vec![Node::Text("Hello HTML world!".to_string())]);
-        let expected_html = "<p>Hello HTML world!</p>";
+        let expected_html = "<p>Hello HTML world!</p>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
     #[test]
     fn test_text_escaping() {
         let node = Node::Paragraph(vec![Node::Text("Hello < & > \" ' world!".to_string())]);
-        let expected_html = "<p>Hello &lt; &amp; &gt; &quot; &#39; world!</p>";
+        let expected_html = "<p>Hello &lt; &amp; &gt; \" ' world!</p>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -83,7 +91,7 @@ mod tests {
             content: vec![Node::Text("Title".to_string())],
             heading_type: Default::default(),
         };
-        let expected_html = "<h1>Title</h1>";
+        let expected_html = "<h1>Title</h1>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -97,7 +105,7 @@ mod tests {
             Node::Text("!".to_string()),
         ]);
         let expected_html =
-            "<p>This is <em>emphasized</em> and this is <strong>strong</strong>!</p>";
+            "<p>This is <em>emphasized</em> and this is <strong>strong</strong>!</p>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -123,7 +131,7 @@ mod tests {
             block_type: Default::default(),
         };
         // Default prefix is "language-"
-        let expected_html = "<pre class=\"language-rust\"><code>fn main() {\n    println!(&quot;Hello&quot;);\n}</code></pre>";
+        let expected_html = "<pre><code class=\"language-rust\">fn main() {\n    println!(\"Hello\");\n}</code></pre>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -135,18 +143,17 @@ mod tests {
             block_type: Default::default(),
         };
         #[cfg(feature = "gfm")]
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             code_block_language_class_prefix: Some("lang-".to_string()),
             strict: false,
             ..Default::default()
         };
         #[cfg(not(feature = "gfm"))]
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             code_block_language_class_prefix: Some("lang-".to_string()),
             strict: false,
         };
-        let expected_html =
-            "<pre class=\"lang-python\"><code>print(&quot;Hello&quot;)</code></pre>";
+        let expected_html = "<pre><code class=\"lang-python\">print(\"Hello\")</code></pre>\n";
         assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
     }
 
@@ -158,18 +165,18 @@ mod tests {
             block_type: Default::default(),
         };
         #[cfg(feature = "gfm")]
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             code_block_language_class_prefix: None,
             strict: false,
             ..Default::default()
         };
         #[cfg(not(feature = "gfm"))]
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             code_block_language_class_prefix: None,
             strict: false,
         };
         // No class attribute should be present if prefix is None
-        let expected_html = "<pre><code>let _ = 1;</code></pre>";
+        let expected_html = "<pre><code>let _ = 1;</code></pre>\n";
         assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
     }
 
@@ -180,7 +187,7 @@ mod tests {
             content: "plain text".to_string(),
             block_type: Default::default(),
         };
-        let expected_html = "<pre><code>plain text</code></pre>";
+        let expected_html = "<pre><code>plain text</code></pre>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -217,7 +224,7 @@ mod tests {
                 content: vec![Node::Paragraph(vec![Node::Text("Item 2".to_string())])],
             },
         ]);
-        let expected_html = "<ul><li><p>Item 1</p></li><li><p>Item 2</p></li></ul>";
+        let expected_html = "<ul>\n<li><p>Item 1</p>\n</li>\n<li><p>Item 2</p>\n</li>\n</ul>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -236,7 +243,8 @@ mod tests {
                 },
             ],
         };
-        let expected_html = "<ol start=\"3\"><li><p>Item A</p></li><li><p>Item B</p></li></ol>";
+        let expected_html =
+            "<ol start=\"3\">\n<li><p>Item A</p>\n</li>\n<li><p>Item B</p>\n</li>\n</ol>\n";
         // Note: Our current ListItem::to_html doesn't use the inner `number` for <li value="...">.
         // CommonMark to HTML spec usually just outputs <li> and relies on <ol start="...">.
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
@@ -245,7 +253,7 @@ mod tests {
     #[test]
     fn test_html_block() {
         let node = Node::HtmlBlock("<div class=\"foo\">Bar</div>".to_string());
-        let expected_html = "<div class=\"foo\">Bar</div>"; // raw_html is used
+        let expected_html = "<div class=\"foo\">Bar</div>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -301,11 +309,11 @@ mod tests {
             content: vec![Node::Text("Done".to_string())],
         };
         let node = Node::UnorderedList(vec![unchecked_item, checked_item]);
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             enable_gfm: true,
-            ..HtmlRenderOptions::default()
+            ..HtmlWriterOptions::default()
         };
-        let expected_html = "<ul><li class=\"task-list-item task-list-item-unchecked\"><input type=\"checkbox\" disabled=\"\" /> To do</li><li class=\"task-list-item task-list-item-checked\"><input type=\"checkbox\" disabled=\"\" checked=\"\" /> Done</li></ul>";
+        let expected_html = "<ul>\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled=\"\" /> To do</li>\n<li class=\"task-list-item task-list-item-checked\"><input type=\"checkbox\" disabled=\"\" checked=\"\" /> Done</li>\n</ul>\n";
         assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
     }
 
@@ -316,7 +324,7 @@ mod tests {
             Node::Paragraph(vec![Node::Text("Another paragraph in quote.".to_string())]),
         ]);
         let expected_html =
-            "<blockquote><p>This is a quote.</p><p>Another paragraph in quote.</p></blockquote>";
+            "<blockquote>\n<p>This is a quote.</p>\n<p>Another paragraph in quote.</p>\n</blockquote>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -341,6 +349,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "gfm")]
     fn test_extended_autolink() {
         // GFM, but our Node::ExtendedAutolink is not conditional
         let node = Node::ExtendedAutolink("www.example.com/path".to_string());
@@ -355,9 +364,9 @@ mod tests {
             label: "lbl".to_string(),
             content: vec![Node::Text("link text".to_string())],
         };
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             strict: false,
-            ..HtmlRenderOptions::default()
+            ..HtmlWriterOptions::default()
         };
         let expected_html = "[link text][lbl]";
         assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
@@ -369,11 +378,11 @@ mod tests {
             label: "shortcut".to_string(),
             content: vec![], // Empty content means use label as text
         };
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             strict: false,
-            ..HtmlRenderOptions::default()
+            ..HtmlWriterOptions::default()
         };
-        let expected_html = "[shortcut][shortcut]";
+        let expected_html = "[shortcut]";
         assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
     }
 
@@ -397,7 +406,7 @@ mod tests {
                 ],
             ],
         };
-        let expected_html = "<table><thead><tr><th>Header 1</th><th>Header 2</th></tr></thead><tbody><tr><td>Cell 1.1</td><td>Cell 1.2</td></tr><tr><td>Cell 2.1</td><td>Cell 2.2</td></tr></tbody></table>";
+        let expected_html = "<table>\n<thead>\n<tr>\n<th>Header 1</th>\n<th>Header 2</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>Cell 1.1</td>\n<td>Cell 1.2</td>\n</tr>\n<tr>\n<td>Cell 2.1</td>\n<td>Cell 2.2</td>\n</tr>\n</tbody>\n</table>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -421,7 +430,7 @@ mod tests {
                 Node::Text("R".to_string()),
             ]],
         };
-        let expected_html = "<table><thead><tr><th style=\"text-align: left;\">H1</th><th style=\"text-align: center;\">H2</th><th style=\"text-align: right;\">H3</th></tr></thead><tbody><tr><td style=\"text-align: left;\">L</td><td style=\"text-align: center;\">C</td><td style=\"text-align: right;\">R</td></tr></tbody></table>";
+        let expected_html = "<table>\n<thead>\n<tr>\n<th style=\"text-align: left;\">H1</th>\n<th style=\"text-align: center;\">H2</th>\n<th style=\"text-align: right;\">H3</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td style=\"text-align: left;\">L</td>\n<td style=\"text-align: center;\">C</td>\n<td style=\"text-align: right;\">R</td>\n</tr>\n</tbody>\n</table>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -437,9 +446,9 @@ mod tests {
             self_closing: false,
         };
         let node = Node::HtmlElement(element);
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             strict: false,
-            ..HtmlRenderOptions::default()
+            ..HtmlWriterOptions::default()
         };
 
         // HTML 输出应该不受警告影响
@@ -463,11 +472,11 @@ mod tests {
             self_closing: false,
         };
         let node = Node::HtmlElement(element);
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             strict: false,
-            ..HtmlRenderOptions::default()
+            ..HtmlWriterOptions::default()
         };
-        let expected_html = "<div> invalid&lt;attr&gt;=&quot;value&quot;Content</div>";
+        let expected_html = "<div invalid<attr>=\"value\">Content</div>";
         assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
     }
 
@@ -481,11 +490,11 @@ mod tests {
             self_closing: false,
         };
         let node = Node::HtmlElement(element);
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             enable_gfm: true,
-            ..HtmlRenderOptions::default()
+            ..HtmlWriterOptions::default()
         };
-        let expected_html = "<script>alert(&#39;test&#39;)</script>";
+        let expected_html = "<script>alert('test')</script>";
         assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
     }
 
@@ -495,9 +504,9 @@ mod tests {
             label: "unresolved".to_string(),
             content: vec![Node::Text("Unresolved Link".to_string())],
         };
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             strict: false,
-            ..HtmlRenderOptions::default()
+            ..HtmlWriterOptions::default()
         };
         let expected_html = "[Unresolved Link][unresolved]";
         assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
@@ -516,14 +525,14 @@ mod tests {
             self_closing: false,
         };
         let node = Node::HtmlElement(element);
-        let options = HtmlRenderOptions {
+        let options = HtmlWriterOptions {
             enable_gfm: true,
             gfm_disallowed_html_tags: vec!["script".to_string()],
-            ..HtmlRenderOptions::default()
+            ..HtmlWriterOptions::default()
         };
 
         // HTML 输出应该不受警告影响
-        let expected_html = "&lt;script&gt;alert(&#39;test&#39;)&lt;/script&gt;";
+        let expected_html = "&lt;script&gt;alert('test')&lt;/script&gt;";
         let actual_html = render_node_to_html(&node, &options).unwrap();
         assert_eq!(actual_html, expected_html);
 

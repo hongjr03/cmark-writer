@@ -8,47 +8,78 @@ use syn::{
 /// Parse custom_node attribute parameters
 struct CustomNodeArgs {
     is_block: Option<bool>,
+    html_impl: Option<bool>,
 }
 
 impl Parse for CustomNodeArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut is_block = None;
+        let mut html_impl = None;
 
         if input.is_empty() {
-            return Ok(CustomNodeArgs { is_block });
+            return Ok(CustomNodeArgs {
+                is_block,
+                html_impl,
+            });
         }
 
-        let ident: Ident = input.parse()?;
-        if ident == "block" {
-            let _: Token![=] = input.parse()?;
-            let value: LitBool = input.parse()?;
-            is_block = Some(value.value);
+        loop {
+            if input.is_empty() {
+                break;
+            }
+
+            let ident: Ident = input.parse()?;
+
+            if ident == "block" {
+                let _: Token![=] = input.parse()?;
+                let value: LitBool = input.parse()?;
+                is_block = Some(value.value);
+            } else if ident == "html_impl" {
+                let _: Token![=] = input.parse()?;
+                let value: LitBool = input.parse()?;
+                html_impl = Some(value.value);
+            } else {
+                return Err(syn::Error::new_spanned(
+                    ident,
+                    "Unknown attribute parameter",
+                ));
+            }
+
+            // Handle optional comma separator
+            if input.peek(Token![,]) {
+                let _: Token![,] = input.parse()?;
+            }
         }
 
-        Ok(CustomNodeArgs { is_block })
+        Ok(CustomNodeArgs {
+            is_block,
+            html_impl,
+        })
     }
 }
 
-/// Custom node attribute macro, replaces the original derive_custom_node! macro
+/// Custom node attribute macro for implementing the CustomNode trait
 ///
 /// This macro automatically implements the CustomNode trait. Users can specify
-/// whether the node is a block element using the `block` parameter.
+/// whether the node is a block element using the `block` parameter and whether
+/// it implements HTML rendering with the `html_impl` parameter.
 ///
 /// # Example
 ///
 /// ```rust
 /// use cmark_writer_macros::custom_node;
 ///
-/// // Specified as an inline element
+/// // Specified as an inline element with both CommonMark and HTML implementations
 /// #[derive(Debug, Clone, PartialEq)]
-/// #[custom_node(block=false)]
+/// #[custom_node(block=false, html_impl=true)]
 /// struct HighlightNode {
 ///     content: String,
 ///     color: String,
 /// }
 ///
 /// impl HighlightNode {
-///     fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+///     // Required for CommonMark rendering
+///     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
 ///         writer.write_str("<span style=\"background-color: ")?;
 ///         writer.write_str(&self.color)?;
 ///         writer.write_str("\">")?;
@@ -56,9 +87,19 @@ impl Parse for CustomNodeArgs {
 ///         writer.write_str("</span>")?;
 ///         Ok(())
 ///     }
+///     
+///     // Optional HTML rendering implementation
+///     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+///         writer.start_tag("span")?;
+///         writer.attribute("style", &format!("background-color: {}", self.color))?;
+///         writer.finish_tag()?;
+///         writer.text(&self.content)?;
+///         writer.end_tag("span")?;
+///         Ok(())
+///     }
 /// }
 ///
-/// // Specified as a block element
+/// // Only CommonMark implementation, default HTML implementation
 /// #[derive(Debug, Clone, PartialEq)]
 /// #[custom_node(block=true)]
 /// struct AlertNode {
@@ -66,7 +107,7 @@ impl Parse for CustomNodeArgs {
 /// }
 ///
 /// impl AlertNode {
-///     fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+///     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
 ///         writer.write_str("<div class=\"alert\">")?;
 ///         writer.write_str(&self.content)?;
 ///         writer.write_str("</div>")?;
@@ -80,7 +121,7 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
     let name = &input.ident;
 
-    // Determine if it's a block element. If not specified, the user needs to provide an is_block_custom method
+    // Configure is_block implementation
     let is_block_impl = if let Some(is_block) = args.is_block {
         quote! {
             fn is_block(&self) -> bool {
@@ -95,16 +136,45 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
+    // Configure html_write implementation
+    let html_write_impl = if args.html_impl.unwrap_or(false) {
+        // When html_impl=true, expect user to implement write_html_custom method
+        quote! {
+            fn html_write(
+                &self,
+                writer: &mut ::cmark_writer::writer::HtmlWriter,
+            ) -> ::cmark_writer::writer::HtmlWriteResult<()> {
+                self.write_html_custom(writer)
+            }
+        }
+    } else {
+        // When html_impl is not set or false, use default implementation
+        quote! {
+            fn html_write(
+                &self,
+                writer: &mut ::cmark_writer::writer::HtmlWriter,
+            ) -> ::cmark_writer::writer::HtmlWriteResult<()> {
+                writer.raw_html(&format!(
+                    "<!-- HTML rendering not implemented for Custom Node: {} -->",
+                    self.type_name()
+                ))?;
+                Ok(())
+            }
+        }
+    };
+
     let expanded = quote! {
         #input
 
         impl ::cmark_writer::ast::CustomNode for #name {
             fn write(
                 &self,
-                writer: &mut dyn ::cmark_writer::ast::CustomNodeWriter,
+                writer: &mut ::cmark_writer::writer::CommonMarkWriter,
             ) -> ::cmark_writer::error::WriteResult<()> {
                 self.write_custom(writer)
             }
+
+            #html_write_impl
 
             fn clone_box(&self) -> Box<dyn ::cmark_writer::ast::CustomNode> {
                 Box::new(self.clone())
@@ -129,7 +199,6 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        // Implementing the CustomNode trait for Box<dyn CustomNode>
         impl #name {
             pub fn matches(node: &dyn ::cmark_writer::ast::CustomNode) -> bool {
                 node.type_name() == std::any::type_name::<#name>() ||

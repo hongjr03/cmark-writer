@@ -1,3 +1,4 @@
+use crate::error::WriteError;
 use std::fmt::{self, Display};
 use std::io;
 
@@ -14,6 +15,8 @@ pub enum HtmlWriteError {
     InvalidHtmlTag(String),
     /// An invalid HTML attribute name was encountered.
     InvalidHtmlAttribute(String),
+    /// An error occurred while writing a custom node.
+    CustomNodeError(String),
     // Add more specific HTML-related errors as needed
 }
 
@@ -37,6 +40,9 @@ impl Display for HtmlWriteError {
             HtmlWriteError::InvalidHtmlAttribute(attr_name) => {
                 write!(f, "Invalid HTML attribute name: {}", attr_name)
             }
+            HtmlWriteError::CustomNodeError(msg) => {
+                write!(f, "Error writing custom node: {}", msg)
+            }
         }
     }
 }
@@ -46,6 +52,26 @@ impl std::error::Error for HtmlWriteError {
         match self {
             HtmlWriteError::Io(err) => Some(err),
             _ => None,
+        }
+    }
+}
+
+impl HtmlWriteError {
+    /// 将 HtmlWriteError 转换为 WriteError
+    pub fn into_write_error(self) -> WriteError {
+        match self {
+            HtmlWriteError::Io(err) => WriteError::IoError(err),
+            HtmlWriteError::UnsupportedNodeType(msg) => WriteError::Custom {
+                message: format!("HTML writer error: {}", msg),
+                code: None,
+            },
+            HtmlWriteError::InvalidStructure(msg) => WriteError::InvalidStructure(msg),
+            HtmlWriteError::InvalidHtmlTag(tag) => WriteError::InvalidHtmlTag(tag),
+            HtmlWriteError::InvalidHtmlAttribute(attr) => WriteError::InvalidHtmlAttribute(attr),
+            HtmlWriteError::CustomNodeError(msg) => WriteError::Custom {
+                message: format!("Custom node error: {}", msg),
+                code: None,
+            },
         }
     }
 }

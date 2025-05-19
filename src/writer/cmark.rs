@@ -4,9 +4,7 @@
 
 #[cfg(feature = "gfm")]
 use crate::ast::TableAlignment;
-use crate::ast::{
-    CodeBlockType, CustomNode, CustomNodeWriter, HeadingType, HtmlElement, ListItem, Node,
-};
+use crate::ast::{CodeBlockType, CustomNode, HeadingType, ListItem, Node};
 use crate::error::{WriteError, WriteResult};
 use crate::options::WriterOptions;
 use log;
@@ -15,8 +13,6 @@ use std::fmt::{self};
 use super::processors::{
     BlockNodeProcessor, CustomNodeProcessor, InlineNodeProcessor, NodeProcessor,
 };
-
-use crate::writer::html;
 
 /// CommonMark writer
 ///
@@ -836,43 +832,95 @@ impl CommonMarkWriter {
         Ok(())
     }
 
-    /// Write an HTML element
-    pub(crate) fn write_html_element(&mut self, element: &HtmlElement) -> WriteResult<()> {
-        #[cfg(feature = "gfm")]
-        let mut html_render_options = html::HtmlRenderOptions::default();
-        #[cfg(not(feature = "gfm"))]
-        let html_render_options = html::HtmlRenderOptions::default();
+    /// Write an AST HtmlElement node as raw HTML string into the CommonMark output.
+    pub(crate) fn write_html_element(
+        &mut self,
+        element: &crate::ast::HtmlElement,
+    ) -> WriteResult<()> {
+        // 首先验证 HTML 标签和属性
+        if self.options.strict {
+            // 检查标签名是否包含不安全字符
+            if element.tag.contains('<') || element.tag.contains('>') {
+                return Err(WriteError::InvalidHtmlTag(element.tag.clone()));
+            }
 
-        #[cfg(feature = "gfm")]
-        {
-            html_render_options.enable_gfm = self.options.enable_gfm;
-            html_render_options.gfm_disallowed_html_tags =
-                self.options.gfm_disallowed_html_tags.clone();
+            // 检查属性名是否包含不安全字符
+            for attr in &element.attributes {
+                if attr.name.contains('<') || attr.name.contains('>') {
+                    return Err(WriteError::InvalidHtmlAttribute(attr.name.clone()));
+                }
+            }
         }
 
-        // code_block_language_class_prefix from HtmlRenderOptions::default() is used.
+        // 创建一个临时的 HtmlWriter 实例来处理 HTML 元素
+        // 这样可以确保 HTML 格式的一致性
+        use crate::writer::html::{HtmlWriter, HtmlWriterOptions};
 
-        let mut html_output_buffer = Vec::new();
-        let mut temp_html_writer =
-            html::HtmlWriter::new(std::io::Cursor::new(&mut html_output_buffer));
-        let node_to_render = Node::HtmlElement(element.clone());
+        // 从 CommonMarkWriter 的选项中派生 HTML 渲染选项
+        let html_options = HtmlWriterOptions {
+            // 使用相同的严格模式设置
+            strict: self.options.strict,
+            // 代码块语言类前缀，保持默认
+            code_block_language_class_prefix: Some("language-".to_string()),
+            #[cfg(feature = "gfm")]
+            enable_gfm: self.options.enable_gfm,
+            #[cfg(feature = "gfm")]
+            gfm_disallowed_html_tags: self.options.gfm_disallowed_html_tags.clone(),
+        };
 
-        temp_html_writer.write_node(&node_to_render, &html_render_options)?;
-        temp_html_writer
-            .flush()
-            .map_err(html::error::HtmlWriteError::Io)?;
+        let mut html_writer = HtmlWriter::with_options(html_options);
 
-        let html_string =
-            String::from_utf8(html_output_buffer).map_err(|utf8_err| WriteError::Custom {
-                message: format!(
-                    "HTML output from HtmlWriter was not valid UTF-8: {}",
-                    utf8_err
-                ),
-                code: None,
-            })?;
+        // 开始标签
+        html_writer
+            .start_tag(&element.tag)
+            .map_err(|e| e.into_write_error())?;
 
-        self.buffer.push_str(&html_string);
-        Ok(())
+        // 添加属性
+        for attr in &element.attributes {
+            html_writer
+                .attribute(&attr.name, &attr.value)
+                .map_err(|e| e.into_write_error())?;
+        }
+
+        // 完成开始标签并处理自闭合标签
+        html_writer.finish_tag().map_err(|e| e.into_write_error())?;
+
+        if !element.self_closing {
+            // 处理子节点
+            if !element.children.is_empty() {
+                for child in &element.children {
+                    html_writer
+                        .write_node(child)
+                        .map_err(|e| e.into_write_error())?;
+                }
+            }
+
+            // 添加结束标签
+            html_writer
+                .end_tag(&element.tag)
+                .map_err(|e| e.into_write_error())?;
+        }
+
+        // Get the generated HTML
+        let html_output = html_writer.into_string();
+
+        // Handle GFM disallowed HTML tags
+        #[cfg(feature = "gfm")]
+        if self.options.enable_gfm
+            && !self.options.gfm_disallowed_html_tags.is_empty()
+            && self
+                .options
+                .gfm_disallowed_html_tags
+                .iter()
+                .any(|tag| tag.eq_ignore_ascii_case(&element.tag))
+        {
+            // If the tag is in the disallowed list, escape it as text
+            use html_escape;
+            return self.write_str(&html_escape::encode_text(&html_output));
+        }
+
+        // Otherwise write the raw HTML
+        self.write_str(&html_output)
     }
 
     /// Get the generated CommonMark format text
@@ -892,6 +940,22 @@ impl CommonMarkWriter {
     /// ```
     pub fn into_string(self) -> String {
         self.buffer
+    }
+
+    /// Write a string to the output buffer
+    ///
+    /// This method is provided for custom node implementations to use
+    pub fn write_str(&mut self, s: &str) -> WriteResult<()> {
+        self.buffer.push_str(s);
+        Ok(())
+    }
+
+    /// Write a character to the output buffer
+    ///
+    /// This method is provided for custom node implementations to use
+    pub fn write_char(&mut self, c: char) -> WriteResult<()> {
+        self.buffer.push(c);
+        Ok(())
     }
     /// Ensure content ends with a newline (for consistent handling at the end of block nodes)
     ///
@@ -949,15 +1013,5 @@ impl fmt::Display for Node {
     }
 }
 
-// Implement CustomNodeWriter trait for CommonMarkWriter
-impl CustomNodeWriter for CommonMarkWriter {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.buffer.push_str(s);
-        Ok(())
-    }
-
-    fn write_char(&mut self, c: char) -> fmt::Result {
-        self.buffer.push(c);
-        Ok(())
-    }
-}
+// The CustomNodeWriter trait has been removed, and CommonMarkWriter now directly provides
+// write_str and write_char methods for custom node implementations to use.

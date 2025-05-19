@@ -1,32 +1,88 @@
-use super::utils::{is_safe_attribute_name, is_safe_tag_name};
-use super::{HtmlRenderOptions, HtmlWriteError, HtmlWriteResult};
-#[cfg(feature = "gfm")]
-use crate::ast::TaskListStatus;
-use crate::ast::{ListItem, Node};
+use crate::ast::{HtmlElement, ListItem, Node};
 use log;
-use std::io::{self, Write};
 
-/// A writer for generating HTML output.
+#[cfg(feature = "gfm")]
+use crate::ast::{TableAlignment, TaskListStatus};
+
+use super::{utils, HtmlWriteError, HtmlWriteResult, HtmlWriterOptions};
+use html_escape;
+
+/// HTML writer for serializing CommonMark AST nodes to HTML.
 ///
-/// It buffers writes and provides methods for generating HTML tags, attributes, and text content,
-/// ensuring proper escaping of special characters.
-pub struct HtmlWriter<W: Write> {
-    writer: W,
+/// `HtmlWriter` provides a flexible API for generating HTML content from AST nodes. It can be used:
+/// - Directly with individual nodes through methods like `write_node`
+/// - For building HTML elements programmatically using the tag and attribute methods
+/// - As part of the CommonMarkWriter's HTML rendering process
+/// - In custom node implementations via the `html_impl=true` attribute
+///
+/// # Examples
+///
+/// ## Basic usage
+///
+/// ```rust
+/// use cmark_writer::{HtmlWriter, Node};
+///
+/// let mut writer = HtmlWriter::new();
+/// let para = Node::Paragraph(vec![Node::Text("Hello, world!".to_string())]);
+/// writer.write_node(&para).unwrap();
+///
+/// let output = writer.into_string();
+/// assert_eq!(output, "<p>Hello, world!</p>\n");
+/// ```
+///
+/// ## Building HTML elements manually
+///
+/// ```rust
+/// use cmark_writer::HtmlWriter;
+///
+/// let mut writer = HtmlWriter::new();
+///
+/// // Create a custom HTML element
+/// writer.start_tag("div").unwrap();
+/// writer.attribute("class", "container").unwrap();
+/// writer.finish_tag().unwrap();
+///
+/// writer.start_tag("h1").unwrap();
+/// writer.finish_tag().unwrap();
+/// writer.text("Welcome").unwrap();
+/// writer.end_tag("h1").unwrap();
+///
+/// writer.end_tag("div").unwrap();
+///
+/// let output = writer.into_string();
+/// assert_eq!(output, "<div class=\"container\"><h1>Welcome</h1></div>");
+/// ```
+#[derive(Debug)]
+pub struct HtmlWriter {
+    options: HtmlWriterOptions,
     buffer: String,
-    tag_opened: bool, // Tracks if a start tag is opened (e.g. <tag) but not yet closed with > or />
+    tag_opened: bool,
 }
 
-impl<W: Write> HtmlWriter<W> {
-    /// Creates a new `HtmlWriter` that writes to the given `writer`.
-    pub fn new(writer: W) -> Self {
+impl HtmlWriter {
+    /// Creates a new HTML writer with default options.
+    pub fn new() -> Self {
+        Self::with_options(HtmlWriterOptions::default())
+    }
+
+    /// Creates a new HTML writer with the specified options.
+    pub fn with_options(options: HtmlWriterOptions) -> Self {
         HtmlWriter {
-            writer,
+            options,
             buffer: String::new(),
             tag_opened: false,
         }
     }
 
-    fn ensure_tag_closed(&mut self) -> io::Result<()> {
+    /// Consumes the writer and returns the generated HTML string.
+    pub fn into_string(mut self) -> String {
+        self.ensure_tag_closed().unwrap();
+        self.buffer
+    }
+
+    // --- Low-level HTML writing primitives ---
+
+    fn ensure_tag_closed(&mut self) -> HtmlWriteResult<()> {
         if self.tag_opened {
             self.buffer.push('>');
             self.tag_opened = false;
@@ -34,32 +90,44 @@ impl<W: Write> HtmlWriter<W> {
         Ok(())
     }
 
-    /// Writes the start of an HTML tag (e.g., initiates `<html>` or `<p`).
-    /// Attributes can be added after this. Call `finish_tag` or write content/end_tag to close it.
-    pub fn start_tag(&mut self, tag_name: &str) -> io::Result<()> {
-        self.ensure_tag_closed()?; // Close any previously opened tag
+    fn start_tag_internal(&mut self, tag_name: &str) -> HtmlWriteResult<()> {
+        self.ensure_tag_closed()?;
         self.buffer.push('<');
         self.buffer.push_str(tag_name);
         self.tag_opened = true;
         Ok(())
     }
 
-    /// Writes an HTML attribute (e.g., `class="example"`).
-    /// Must be called after `start_tag` and before `finish_tag`, `text`, or `end_tag`.
-    pub fn attribute(&mut self, key: &str, value: &str) -> io::Result<()> {
+    /// Starts an HTML tag with the given name.
+    ///
+    /// This is a public wrapper around start_tag_internal.
+    pub fn start_tag(&mut self, tag_name: &str) -> HtmlWriteResult<()> {
+        self.start_tag_internal(tag_name)
+    }
+
+    fn attribute_internal(&mut self, key: &str, value: &str) -> HtmlWriteResult<()> {
         if !self.tag_opened {
-            return Err(io::Error::other("attribute called without an open tag"));
+            return Err(HtmlWriteError::InvalidHtmlTag(
+                "Cannot write attribute: no tag is currently open.".to_string(),
+            ));
         }
         self.buffer.push(' ');
         self.buffer.push_str(key);
         self.buffer.push_str("=\"");
-        escape_html_to_buffer(value, &mut self.buffer);
+        self.buffer
+            .push_str(html_escape::encode_text(value).as_ref());
         self.buffer.push('"');
         Ok(())
     }
 
-    /// Finishes an open start tag by writing `>`.
-    pub fn finish_tag(&mut self) -> io::Result<()> {
+    /// Adds an attribute to the currently open tag.
+    ///
+    /// This is a public wrapper around attribute_internal.
+    pub fn attribute(&mut self, key: &str, value: &str) -> HtmlWriteResult<()> {
+        self.attribute_internal(key, value)
+    }
+
+    fn finish_tag_internal(&mut self) -> HtmlWriteResult<()> {
         if self.tag_opened {
             self.buffer.push('>');
             self.tag_opened = false;
@@ -67,9 +135,14 @@ impl<W: Write> HtmlWriter<W> {
         Ok(())
     }
 
-    /// Writes the end of an HTML tag (e.g., `</html>`, `</p>`).
-    /// This also ensures any opened start tag is finished.
-    pub fn end_tag(&mut self, tag_name: &str) -> io::Result<()> {
+    /// Finishes the current open tag.
+    ///
+    /// This is a public wrapper around finish_tag_internal.
+    pub fn finish_tag(&mut self) -> HtmlWriteResult<()> {
+        self.finish_tag_internal()
+    }
+
+    fn end_tag_internal(&mut self, tag_name: &str) -> HtmlWriteResult<()> {
         self.ensure_tag_closed()?;
         self.buffer.push_str("</");
         self.buffer.push_str(tag_name);
@@ -77,439 +150,438 @@ impl<W: Write> HtmlWriter<W> {
         Ok(())
     }
 
-    /// Writes text content, escaping special HTML characters.
-    /// This also ensures any opened start tag is finished.
-    pub fn text(&mut self, text: &str) -> io::Result<()> {
+    /// Closes an HTML tag with the given name.
+    ///
+    /// This is a public wrapper around end_tag_internal.
+    pub fn end_tag(&mut self, tag_name: &str) -> HtmlWriteResult<()> {
+        self.end_tag_internal(tag_name)
+    }
+
+    fn text_internal(&mut self, text: &str) -> HtmlWriteResult<()> {
         self.ensure_tag_closed()?;
-        escape_html_to_buffer(text, &mut self.buffer);
+        self.buffer
+            .push_str(html_escape::encode_text(text).as_ref());
         Ok(())
     }
 
-    /// Writes a self-closing HTML tag (e.g., `<img />`, `<br />`).
-    /// If attributes are needed, use `start_tag`, `attribute` calls, then `finish_self_closing_tag`.
-    pub fn self_closing_tag(&mut self, tag_name: &str) -> io::Result<()> {
-        self.ensure_tag_closed()?; // Close any previously opened tag.
+    /// Writes text content, escaping HTML special characters.
+    ///
+    /// This is a public wrapper around text_internal.
+    pub fn text(&mut self, text: &str) -> HtmlWriteResult<()> {
+        self.text_internal(text)
+    }
+
+    /// Writes a string to the output, escaping HTML special characters.
+    ///
+    /// This is an alias for `text` method, provided for compatibility with
+    /// the CustomNodeWriter trait interface.
+    pub fn write_str(&mut self, s: &str) -> HtmlWriteResult<()> {
+        self.text(s)
+    }
+
+    fn self_closing_tag_internal(&mut self, tag_name: &str) -> HtmlWriteResult<()> {
+        self.ensure_tag_closed()?;
         self.buffer.push('<');
         self.buffer.push_str(tag_name);
         self.buffer.push_str(" />");
-        // self.tag_opened remains false as this tag is now complete.
+        self.tag_opened = false;
         Ok(())
     }
 
-    /// Finishes an open start tag as a self-closing tag by writing ` />`.
-    pub fn finish_self_closing_tag(&mut self) -> io::Result<()> {
-        if self.tag_opened {
-            self.buffer.push_str(" />");
-            self.tag_opened = false;
+    fn finish_self_closing_tag_internal(&mut self) -> HtmlWriteResult<()> {
+        if !self.tag_opened {
+            return Err(HtmlWriteError::InvalidHtmlTag(
+                "Cannot finish self-closing tag: no tag is currently open.".to_string(),
+            ));
         }
-        // Else: error or no-op? If no tag was opened, this is a usage error.
-        // return Err(io::Error::new(io::ErrorKind::Other, "finish_self_closing_tag called without an open tag"));
+        self.buffer.push_str(" />");
+        self.tag_opened = false;
         Ok(())
     }
 
-    /// Writes a raw HTML string to the buffer without any escaping.
-    /// This should be used with caution, only with HTML that is known to be safe.
-    /// This also ensures any opened start tag is finished.
-    pub fn raw_html(&mut self, html: &str) -> io::Result<()> {
+    /// Finishes the current open tag as a self-closing tag.
+    ///
+    /// This is a public wrapper around finish_self_closing_tag_internal.
+    pub fn finish_self_closing_tag(&mut self) -> HtmlWriteResult<()> {
+        self.finish_self_closing_tag_internal()
+    }
+
+    fn raw_html_internal(&mut self, html: &str) -> HtmlWriteResult<()> {
         self.ensure_tag_closed()?;
         self.buffer.push_str(html);
         Ok(())
     }
 
-    /// Writes a CommonMark AST `Node` to HTML using the provided options.
-    /// This is the main rendering method for converting AST nodes to HTML.
-    pub fn write_node(&mut self, node: &Node, options: &HtmlRenderOptions) -> HtmlWriteResult<()> {
+    /// Writes raw HTML content directly to the output.
+    ///
+    /// This method allows adding arbitrary HTML content without escaping.
+    /// It should be used with caution as it can introduce security issues
+    /// if used with untrusted input.
+    pub fn raw_html(&mut self, html: &str) -> HtmlWriteResult<()> {
+        self.raw_html_internal(html)
+    }
+
+    // --- Main Node Dispatcher ---
+
+    /// Writes an AST `Node` to HTML using the configured options.
+    pub fn write_node(&mut self, node: &Node) -> HtmlWriteResult<()> {
         match node {
-            Node::Document(children) => {
-                for child in children {
-                    self.write_node(child, options)?;
-                }
-                Ok(())
-            }
-            Node::Paragraph(children) => {
-                self.start_tag("p")?;
-                self.finish_tag()?;
-                for child in children {
-                    self.write_node(child, options)?;
-                }
-                self.end_tag("p")?;
-                Ok(())
-            }
-            Node::Text(text) => {
-                self.text(text)?;
-                Ok(())
-            }
-            Node::Heading { level, content, .. } => {
-                let tag_name = format!("h{}", level);
-                self.start_tag(&tag_name)?;
-                self.finish_tag()?;
-                for child in content {
-                    self.write_node(child, options)?;
-                }
-                self.end_tag(&tag_name)?;
-                Ok(())
-            }
-            Node::Emphasis(children) => {
-                self.start_tag("em")?;
-                self.finish_tag()?;
-                for child in children {
-                    self.write_node(child, options)?;
-                }
-                self.end_tag("em")?;
-                Ok(())
-            }
-            Node::Strong(children) => {
-                self.start_tag("strong")?;
-                self.finish_tag()?;
-                for child in children {
-                    self.write_node(child, options)?;
-                }
-                self.end_tag("strong")?;
-                Ok(())
-            }
-            Node::ThematicBreak => {
-                self.self_closing_tag("hr")?;
-                self.raw_html("\n")?;
-                Ok(())
-            }
-            Node::InlineCode(code) => {
-                self.start_tag("code")?;
-                self.finish_tag()?;
-                self.text(code)?;
-                self.end_tag("code")?;
-                Ok(())
-            }
+            Node::Document(children) => self.write_document_node(children),
+            Node::Paragraph(children) => self.write_paragraph_node(children),
+            Node::Text(text) => self.write_text_node(text),
+            Node::Heading { level, content, .. } => self.write_heading_node(*level, content),
+            Node::Emphasis(children) => self.write_emphasis_node(children),
+            Node::Strong(children) => self.write_strong_node(children),
+            Node::ThematicBreak => self.write_thematic_break_node(),
+            Node::InlineCode(code) => self.write_inline_code_node(code),
             Node::CodeBlock {
                 language, content, ..
-            } => {
-                self.start_tag("pre")?;
-                if let Some(prefix) = &options.code_block_language_class_prefix {
-                    if let Some(lang) = language {
-                        if !lang.is_empty() {
-                            self.attribute("class", &format!("{}{}", prefix, lang))?;
-                        }
-                    }
-                }
-                self.finish_tag()?;
-
-                self.start_tag("code")?;
-                self.finish_tag()?;
-
-                self.text(content)?;
-                self.end_tag("code")?;
-                self.end_tag("pre")?;
-                Ok(())
-            }
-            Node::HtmlBlock(block_content) => {
-                self.raw_html(block_content)?;
-                Ok(())
-            }
-            Node::HtmlElement(element) => {
-                #[cfg(feature = "gfm")]
-                if options.enable_gfm
-                    && options
-                        .gfm_disallowed_html_tags
-                        .iter()
-                        .any(|tag| tag.eq_ignore_ascii_case(&element.tag))
-                {
-                    self.textualize_full_element(element, options)?;
-                    return Ok(());
-                }
-
-                if !is_safe_tag_name(&element.tag) {
-                    if options.strict {
-                        return Err(HtmlWriteError::InvalidHtmlTag(element.tag.clone()));
-                    } else {
-                        log::warn!(
-                            "Invalid HTML tag name '{}' encountered. Textualizing entire element in non-strict mode.",
-                            element.tag
-                        );
-                        self.textualize_full_element(element, options)?;
-                        return Ok(());
-                    }
-                }
-                self.start_tag(&element.tag)?;
-                for attr in &element.attributes {
-                    if !is_safe_attribute_name(&attr.name) {
-                        if options.strict {
-                            return Err(HtmlWriteError::InvalidHtmlAttribute(attr.name.clone()));
-                        } else {
-                            log::warn!(
-                                "Invalid HTML attribute name '{}' in tag '{}' encountered. Textualizing attribute in non-strict mode.",
-                                attr.name, element.tag
-                            );
-                            self.text(" ")?;
-                            self.text(&attr.name)?;
-                            self.text("=")?;
-                            self.text("\"")?;
-                            self.text(&attr.value)?;
-                            self.text("\"")?;
-                            continue;
-                        }
-                    }
-                    self.attribute(&attr.name, &attr.value)?;
-                }
-                if element.self_closing {
-                    self.finish_self_closing_tag()?;
-                } else {
-                    self.finish_tag()?;
-                    for child in &element.children {
-                        self.write_node(child, options)?;
-                    }
-                    self.end_tag(&element.tag)?;
-                }
-                Ok(())
-            }
-            Node::SoftBreak => {
-                self.raw_html("\n")?;
-                Ok(())
-            }
-            Node::HardBreak => {
-                self.self_closing_tag("br")?;
-                self.raw_html("\n")?;
-                Ok(())
-            }
+            } => self.write_code_block_node(language, content),
+            Node::HtmlBlock(block_content) => self.write_html_block_node(block_content),
+            Node::HtmlElement(element) => self.write_html_element_node(element),
+            Node::SoftBreak => self.write_soft_break_node(),
+            Node::HardBreak => self.write_hard_break_node(),
             Node::Link {
                 url,
                 title,
                 content,
-            } => {
-                self.start_tag("a")?;
-                self.attribute("href", url)?;
-                if let Some(title_str) = title {
-                    self.attribute("title", title_str)?;
-                }
-                self.finish_tag()?;
-                for child in content {
-                    self.write_node(child, options)?;
-                }
-                self.end_tag("a")?;
-                Ok(())
-            }
-            Node::Image { url, title, alt } => {
-                self.start_tag("img")?;
-                self.attribute("src", url)?;
-
-                let mut alt_text_buffer = String::new();
-                render_nodes_to_plain_text(alt, &mut alt_text_buffer, options);
-                self.attribute("alt", &alt_text_buffer)?;
-
-                if let Some(t) = title {
-                    if !t.is_empty() {
-                        self.attribute("title", t)?;
-                    }
-                }
-                self.finish_self_closing_tag()?;
-                Ok(())
-            }
-            Node::BlockQuote(children) => {
-                self.start_tag("blockquote")?;
-                self.finish_tag()?;
-                for child in children {
-                    self.write_node(child, options)?;
-                }
-                self.end_tag("blockquote")?;
-                Ok(())
-            }
-            Node::OrderedList { start, items } => {
-                self.start_tag("ol")?;
-                if *start != 1 {
-                    self.attribute("start", &start.to_string())?;
-                }
-                self.finish_tag()?;
-                for item in items {
-                    self.write_list_item(item, options)?;
-                }
-                self.end_tag("ol")?;
-                Ok(())
-            }
-            Node::UnorderedList(items) => {
-                self.start_tag("ul")?;
-                self.finish_tag()?;
-                for item in items {
-                    self.write_list_item(item, options)?;
-                }
-                self.end_tag("ul")?;
-                Ok(())
-            }
+            } => self.write_link_node(url, title, content),
+            Node::Image { url, title, alt } => self.write_image_node(url, title, alt),
+            Node::BlockQuote(children) => self.write_blockquote_node(children),
+            Node::OrderedList { start, items } => self.write_ordered_list_node(*start, items),
+            Node::UnorderedList(items) => self.write_unordered_list_node(items),
             #[cfg(feature = "gfm")]
-            Node::Strikethrough(children) => {
-                self.start_tag("del")?;
-                self.finish_tag()?;
-                for child in children {
-                    self.write_node(child, options)?;
-                }
-                self.end_tag("del")?;
-                Ok(())
-            }
+            Node::Strikethrough(children) => self.write_strikethrough_node(children),
             Node::Table {
                 headers,
                 #[cfg(feature = "gfm")]
                 alignments,
                 rows,
-            } => {
-                self.start_tag("table")?;
-                self.finish_tag()?;
-
-                self.start_tag("thead")?;
-                self.finish_tag()?;
-                self.start_tag("tr")?;
-                self.finish_tag()?;
-                for (i_idx, header_node) in headers.iter().enumerate() {
-                    self.start_tag("th")?;
-                    #[cfg(feature = "gfm")]
-                    {
-                        if i_idx < alignments.len() {
-                            match alignments[i_idx] {
-                                crate::ast::TableAlignment::Left => {
-                                    self.attribute("style", "text-align: left;")?
-                                }
-                                crate::ast::TableAlignment::Center => {
-                                    self.attribute("style", "text-align: center;")?
-                                }
-                                crate::ast::TableAlignment::Right => {
-                                    self.attribute("style", "text-align: right;")?
-                                }
-                                crate::ast::TableAlignment::None => {}
-                            }
-                        }
-                    }
-                    #[cfg(not(feature = "gfm"))]
-                    let _ = i_idx;
-
-                    self.finish_tag()?;
-                    self.write_node(header_node, options)?;
-                    self.end_tag("th")?;
-                }
-                self.end_tag("tr")?;
-                self.end_tag("thead")?;
-
-                self.start_tag("tbody")?;
-                self.finish_tag()?;
-                for row_nodes in rows {
-                    self.start_tag("tr")?;
-                    self.finish_tag()?;
-                    for (c_idx, cell_node) in row_nodes.iter().enumerate() {
-                        self.start_tag("td")?;
-                        #[cfg(feature = "gfm")]
-                        {
-                            if c_idx < alignments.len() {
-                                match alignments[c_idx] {
-                                    crate::ast::TableAlignment::Left => {
-                                        self.attribute("style", "text-align: left;")?
-                                    }
-                                    crate::ast::TableAlignment::Center => {
-                                        self.attribute("style", "text-align: center;")?
-                                    }
-                                    crate::ast::TableAlignment::Right => {
-                                        self.attribute("style", "text-align: right;")?
-                                    }
-                                    crate::ast::TableAlignment::None => {}
-                                }
-                            }
-                        }
-                        #[cfg(not(feature = "gfm"))]
-                        let _ = c_idx;
-
-                        self.finish_tag()?;
-                        self.write_node(cell_node, options)?;
-                        self.end_tag("td")?;
-                    }
-                    self.end_tag("tr")?;
-                }
-                self.end_tag("tbody")?;
-                self.end_tag("table")?;
-                Ok(())
-            }
-            Node::Autolink { url, is_email } => {
-                self.start_tag("a")?;
-                let href = if *is_email && !url.starts_with("mailto:") {
-                    format!("mailto:{}", url)
-                } else {
-                    url.clone()
-                };
-                self.attribute("href", &href)?;
-                self.finish_tag()?;
-                self.text(url)?;
-                self.end_tag("a")?;
-                Ok(())
-            }
-            Node::ExtendedAutolink(url) => {
-                self.start_tag("a")?;
-                self.attribute("href", url)?;
-                self.finish_tag()?;
-                self.text(url)?;
-                self.end_tag("a")?;
-                Ok(())
-            }
-            Node::LinkReferenceDefinition { .. } => Ok(()),
+            } => self.write_table_node(
+                headers,
+                #[cfg(feature = "gfm")]
+                alignments,
+                rows,
+            ),
+            Node::Autolink { url, is_email } => self.write_autolink_node(url, *is_email),
+            #[cfg(feature = "gfm")]
+            Node::ExtendedAutolink(url) => self.write_extended_autolink_node(url),
+            Node::LinkReferenceDefinition { .. } => Ok(()), // Definitions are not rendered in final HTML
             Node::ReferenceLink { label, content } => {
-                if options.strict {
-                    Err(HtmlWriteError::UnsupportedNodeType(format!(
-                        "Unresolved reference link '{}' encountered in strict mode.",
-                        label
-                    )))
-                } else {
-                    log::warn!(
-                        "Unresolved reference link '{}' encountered. Rendering as plain text.",
-                        label
-                    );
-                    self.text("[")?;
-                    if content.is_empty() {
-                        self.text(label)?;
-                    } else {
-                        for child in content {
-                            self.write_node(
-                                child,
-                                &HtmlRenderOptions {
-                                    strict: false,
-                                    ..options.clone()
-                                },
-                            )?;
-                        }
-                    }
-                    self.text("][")?;
-                    self.text(label)?;
-                    self.text("]")?;
-                    Ok(())
-                }
+                self.write_reference_link_node(label, content)
             }
             Node::Custom(custom_node) => {
-                match custom_node.to_html_string(options) {
-                    Ok(html_string) => self.raw_html(&html_string)?,
-                    Err(e) => return Err(e),
-                }
-                Ok(())
+                // Call the CustomNode's html_write method, which handles the HTML rendering
+                custom_node.html_write(self)
             }
+            // Fallback for node types not handled, especially if GFM is off and GFM nodes appear
             #[cfg(not(feature = "gfm"))]
-            other_node => Err(HtmlWriteError::UnsupportedNodeType(format!(
-                "Node type {:?} is not supported for HTML conversion.",
-                other_node
-            ))),
+            Node::ExtendedAutolink(url) => {
+                // Handle GFM specific nodes explicitly if feature is off
+                log::warn!("ExtendedAutolink encountered but GFM feature is not enabled. Rendering as text: {}", url);
+                self.text_internal(url)
+            }
+            // All node types are handled above, but keeping this for future extensibility
+            #[allow(unreachable_patterns)]
+            _ => Err(HtmlWriteError::UnsupportedNodeType(format!("{:?}", node))),
         }
     }
 
-    fn write_list_item(
+    // --- Node-Specific Writing Methods (Internal) ---
+
+    fn write_document_node(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
+        for child in children {
+            self.write_node(child)?;
+            // Optionally add newlines between major block elements in HTML source
+            if child.is_block() && !self.buffer.ends_with('\n') {
+                // self.raw_html_internal("\n")?;
+            }
+        }
+        Ok(())
+    }
+
+    fn write_paragraph_node(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
+        self.start_tag_internal("p")?;
+        self.finish_tag_internal()?;
+        for child in children {
+            self.write_node(child)?;
+        }
+        self.end_tag_internal("p")?;
+        self.raw_html_internal("\n")?;
+        Ok(())
+    }
+
+    fn write_text_node(&mut self, text: &str) -> HtmlWriteResult<()> {
+        self.text_internal(text)
+    }
+
+    fn write_heading_node(&mut self, level: u8, content: &[Node]) -> HtmlWriteResult<()> {
+        let tag_name = format!("h{}", level.clamp(1, 6));
+        self.start_tag_internal(&tag_name)?;
+        self.finish_tag_internal()?;
+        for child in content {
+            self.write_node(child)?;
+        }
+        self.end_tag_internal(&tag_name)?;
+        self.raw_html_internal("\n")?;
+        Ok(())
+    }
+
+    fn write_emphasis_node(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
+        self.start_tag_internal("em")?;
+        self.finish_tag_internal()?;
+        for child in children {
+            self.write_node(child)?;
+        }
+        self.end_tag_internal("em")?;
+        Ok(())
+    }
+
+    fn write_strong_node(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
+        self.start_tag_internal("strong")?;
+        self.finish_tag_internal()?;
+        for child in children {
+            self.write_node(child)?;
+        }
+        self.end_tag_internal("strong")?;
+        Ok(())
+    }
+
+    fn write_thematic_break_node(&mut self) -> HtmlWriteResult<()> {
+        self.self_closing_tag_internal("hr")?;
+        self.raw_html_internal("\n")?;
+        Ok(())
+    }
+
+    fn write_inline_code_node(&mut self, code: &str) -> HtmlWriteResult<()> {
+        self.start_tag_internal("code")?;
+        self.finish_tag_internal()?;
+        self.text_internal(code)?;
+        self.end_tag_internal("code")?;
+        Ok(())
+    }
+
+    fn write_code_block_node(
         &mut self,
-        list_item: &ListItem, // Correct type from ast::ListItem
-        options: &HtmlRenderOptions,
+        language: &Option<String>,
+        content: &str,
     ) -> HtmlWriteResult<()> {
-        self.start_tag("li")?;
+        self.start_tag_internal("pre")?;
+        self.finish_tag_internal()?; // Finish <pre> before potentially adding attributes to <code> or <span>
+        self.start_tag_internal("code")?;
+        if let Some(prefix) = &self.options.code_block_language_class_prefix {
+            if let Some(lang) = language {
+                if !lang.is_empty() {
+                    self.attribute_internal("class", &format!("{}{}", prefix, lang.trim()))?;
+                }
+            }
+        }
+        self.finish_tag_internal()?;
+        self.text_internal(content)?;
+        self.end_tag_internal("code")?;
+        self.end_tag_internal("pre")?;
+        self.raw_html_internal("\n")?;
+        Ok(())
+    }
+
+    fn write_html_block_node(&mut self, block_content: &str) -> HtmlWriteResult<()> {
+        self.raw_html_internal(block_content)?;
+        if !block_content.ends_with('\n') {
+            self.raw_html_internal("\n")?;
+        }
+        Ok(())
+    }
+
+    fn write_html_element_node(&mut self, element: &HtmlElement) -> HtmlWriteResult<()> {
+        #[cfg(feature = "gfm")]
+        if self.options.enable_gfm
+            && self
+                .options
+                .gfm_disallowed_html_tags
+                .iter()
+                .any(|tag| tag.eq_ignore_ascii_case(&element.tag))
+        {
+            log::debug!("GFM: Textualizing disallowed HTML tag: <{}>", element.tag);
+            self.textualize_full_element_node(element)?;
+            return Ok(());
+        }
+
+        if !utils::is_safe_tag_name(&element.tag) {
+            if self.options.strict {
+                return Err(HtmlWriteError::InvalidHtmlTag(element.tag.clone()));
+            } else {
+                log::warn!(
+                    "Invalid HTML tag name '{}' encountered. Textualizing in non-strict mode.",
+                    element.tag
+                );
+                self.textualize_full_element_node(element)?;
+                return Ok(());
+            }
+        }
+
+        self.start_tag_internal(&element.tag)?;
+        for attr in &element.attributes {
+            if !utils::is_safe_attribute_name(&attr.name) {
+                if self.options.strict {
+                    return Err(HtmlWriteError::InvalidHtmlAttribute(attr.name.clone()));
+                } else {
+                    log::warn!("Invalid HTML attribute name '{}' in tag '{}'. Textualizing attribute in non-strict mode.", attr.name, element.tag);
+                    // Simple textualization of the attribute itself
+                    self.buffer.push(' ');
+                    self.buffer.push_str(&attr.name);
+                    self.buffer.push_str("=\"");
+                    self.buffer
+                        .push_str(html_escape::encode_text(&attr.value).as_ref()); // Attribute value should be escaped
+                    self.buffer.push('"');
+                    continue;
+                }
+            }
+            self.attribute_internal(&attr.name, &attr.value)?;
+        }
+
+        if element.self_closing {
+            self.finish_self_closing_tag_internal()?;
+        } else {
+            self.finish_tag_internal()?;
+            for child in &element.children {
+                self.write_node(child)?;
+            }
+            self.end_tag_internal(&element.tag)?;
+        }
+        // Determine if a newline is appropriate based on whether the original HTML tag is block or inline.
+        // This information isn't readily available, so we might add a newline if it's a common block tag.
+        // For now, omitting conditional newline for brevity.
+        Ok(())
+    }
+
+    fn textualize_full_element_node(&mut self, element: &HtmlElement) -> HtmlWriteResult<()> {
+        self.text_internal("<")?;
+        self.text_internal(&element.tag)?;
+        for attr in &element.attributes {
+            self.text_internal(" ")?;
+            self.text_internal(&attr.name)?;
+            self.text_internal("=")?;
+            self.text_internal("\"")?;
+            self.text_internal(&attr.value)?; // Value is part of the text, so it's escaped by text_internal
+            self.text_internal("\"")?;
+        }
+        if element.self_closing {
+            self.text_internal(" />")?;
+        } else {
+            self.text_internal(">")?;
+            for child in &element.children {
+                self.write_node(child)?; // Children are rendered normally
+            }
+            self.text_internal("</")?;
+            self.text_internal(&element.tag)?;
+            self.text_internal(">")?;
+        }
+        Ok(())
+    }
+
+    fn write_soft_break_node(&mut self) -> HtmlWriteResult<()> {
+        // Soft line breaks in CommonMark are rendered as a newline in HTML source,
+        // or a space if the line break was for wrapping.
+        // Most browsers will treat a newline in HTML as a single space.
+        self.raw_html_internal("\n")
+    }
+
+    fn write_hard_break_node(&mut self) -> HtmlWriteResult<()> {
+        self.self_closing_tag_internal("br")?;
+        self.raw_html_internal("\n")
+    }
+
+    fn write_link_node(
+        &mut self,
+        url: &str,
+        title: &Option<String>,
+        content: &[Node],
+    ) -> HtmlWriteResult<()> {
+        self.start_tag_internal("a")?;
+        self.attribute_internal("href", url)?;
+        if let Some(title_str) = title {
+            if !title_str.is_empty() {
+                self.attribute_internal("title", title_str)?;
+            }
+        }
+        self.finish_tag_internal()?;
+        for child in content {
+            self.write_node(child)?;
+        }
+        self.end_tag_internal("a")?;
+        Ok(())
+    }
+
+    fn write_image_node(
+        &mut self,
+        url: &str,
+        title: &Option<String>,
+        alt: &[Node],
+    ) -> HtmlWriteResult<()> {
+        self.start_tag_internal("img")?;
+        self.attribute_internal("src", url)?;
+        let mut alt_text_buffer = String::new();
+        render_nodes_to_plain_text(alt, &mut alt_text_buffer, &self.options);
+        self.attribute_internal("alt", &alt_text_buffer)?;
+        if let Some(title_str) = title {
+            if !title_str.is_empty() {
+                self.attribute_internal("title", title_str)?;
+            }
+        }
+        self.finish_self_closing_tag_internal()?;
+        Ok(())
+    }
+
+    fn write_blockquote_node(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
+        self.start_tag_internal("blockquote")?;
+        self.finish_tag_internal()?;
+        self.raw_html_internal("\n")?;
+        for child in children {
+            self.write_node(child)?;
+        }
+        self.end_tag_internal("blockquote")?;
+        self.raw_html_internal("\n")?;
+        Ok(())
+    }
+
+    fn write_list_item_node_content(&mut self, item_content: &[Node]) -> HtmlWriteResult<()> {
+        // This is a simplified handling. CommonMark's "tight" vs "loose" list rules
+        // determine if paragraph tags are used inside <li> for paragraphs.
+        // If the first/only child of <li> content is a paragraph, and it's a tight list,
+        // the <p> tags are often omitted.
+        // This implementation will render <p> if Node::Paragraph is present.
+        let mut add_newline_before_next_child = false;
+        for child_node in item_content.iter() {
+            if add_newline_before_next_child {
+                self.raw_html_internal("\n")?;
+                add_newline_before_next_child = false;
+            }
+            self.write_node(child_node)?;
+            if child_node.is_block() {
+                add_newline_before_next_child = true;
+            }
+        }
+        Ok(())
+    }
+
+    fn write_list_item_node(&mut self, item: &ListItem) -> HtmlWriteResult<()> {
+        self.start_tag_internal("li")?;
 
         #[cfg(feature = "gfm")]
-        if let ListItem::Task { status, .. } = list_item {
-            if options.enable_gfm {
+        if self.options.enable_gfm {
+            if let ListItem::Task { status, .. } = item {
                 let class_name = if *status == TaskListStatus::Checked {
                     "task-list-item task-list-item-checked"
                 } else {
-                    "task-list-item task-list-item-unchecked"
+                    "task-list-item" // GFM spec doesn't mandate a specific class for unchecked, just for checked.
+                                     // Some renderers use task-list-item-unchecked.
                 };
-                self.attribute("class", class_name)?;
+                self.attribute_internal("class", class_name)?;
             }
         }
-        self.finish_tag()?;
+        self.finish_tag_internal()?; // Finish <li> tag
 
-        let item_content: &Vec<Node> = match list_item {
+        let content = match item {
             ListItem::Unordered { content } => content,
             ListItem::Ordered { content, .. } => content,
             #[cfg(feature = "gfm")]
@@ -517,305 +589,326 @@ impl<W: Write> HtmlWriter<W> {
         };
 
         #[cfg(feature = "gfm")]
-        if let ListItem::Task { status, .. } = list_item {
-            if options.enable_gfm {
-                self.start_tag("input")?;
-                self.attribute("type", "checkbox")?;
-                self.attribute("disabled", "")?;
+        if self.options.enable_gfm {
+            if let ListItem::Task { status, .. } = item {
+                self.start_tag_internal("input")?;
+                self.attribute_internal("type", "checkbox")?;
+                self.attribute_internal("disabled", "")?; // GFM task list items are disabled
                 if *status == TaskListStatus::Checked {
-                    self.attribute("checked", "")?;
+                    self.attribute_internal("checked", "")?;
                 }
-                self.finish_self_closing_tag()?;
-                self.raw_html(" ")?; // Space after checkbox before content
+                self.finish_self_closing_tag_internal()?;
+                self.raw_html_internal(" ")?; // Space after checkbox
             }
         }
-
-        // Write content directly without wrapping in <p> for task list items
-        for child_node in item_content {
-            self.write_node(child_node, options)?;
-        }
-
-        self.end_tag("li")?;
+        self.write_list_item_node_content(content)?;
+        self.end_tag_internal("li")?;
+        self.raw_html_internal("\n")?;
         Ok(())
     }
 
-    /// Helper method to render an entire HTML element (tag, attributes, children) as escaped text.
-    /// This is used when a tag is disallowed (e.g., by GFM rules or due to unsafe characters in non-strict mode).
-    fn textualize_full_element(
+    fn write_ordered_list_node(&mut self, start: u32, items: &[ListItem]) -> HtmlWriteResult<()> {
+        self.start_tag_internal("ol")?;
+        if start != 1 {
+            self.attribute_internal("start", &start.to_string())?;
+        }
+        self.finish_tag_internal()?;
+        self.raw_html_internal("\n")?;
+        for item in items {
+            self.write_list_item_node(item)?;
+        }
+        self.end_tag_internal("ol")?;
+        self.raw_html_internal("\n")?;
+        Ok(())
+    }
+
+    fn write_unordered_list_node(&mut self, items: &[ListItem]) -> HtmlWriteResult<()> {
+        self.start_tag_internal("ul")?;
+        self.finish_tag_internal()?;
+        self.raw_html_internal("\n")?;
+        for item in items {
+            self.write_list_item_node(item)?;
+        }
+        self.end_tag_internal("ul")?;
+        self.raw_html_internal("\n")?;
+        Ok(())
+    }
+
+    #[cfg(feature = "gfm")]
+    fn write_strikethrough_node(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
+        if !self.options.enable_gfm {
+            // If GFM is disabled (e.g. via a more granular gfm_strikethrough option if added),
+            // render content as is. This case should ideally be guarded by options check.
+            log::warn!("Strikethrough node encountered but GFM (or GFM strikethrough) is not enabled. Rendering content as plain.");
+            for child in children {
+                self.write_node(child)?;
+            }
+            return Ok(());
+        }
+        self.start_tag_internal("del")?;
+        self.finish_tag_internal()?;
+        for child in children {
+            self.write_node(child)?;
+        }
+        self.end_tag_internal("del")?;
+        Ok(())
+    }
+
+    fn write_table_node(
         &mut self,
-        element: &crate::ast::HtmlElement,
-        options: &HtmlRenderOptions,
+        headers: &[Node],
+        #[cfg(feature = "gfm")] alignments: &[TableAlignment],
+        rows: &[Vec<Node>],
     ) -> HtmlWriteResult<()> {
-        self.text("<")?;
-        self.text(&element.tag)?;
-        for attr in &element.attributes {
-            self.text(" ")?;
-            self.text(&attr.name)?;
-            self.text("=")?;
-            self.text("\"")?;
-            self.text(&attr.value)?;
-            self.text("\"")?;
-        }
-        if element.self_closing {
-            self.text(" />")?;
-        } else {
-            self.text(">")?;
-            for child in &element.children {
-                self.write_node(child, options)?;
+        self.start_tag_internal("table")?;
+        self.finish_tag_internal()?;
+        self.raw_html_internal("\n")?;
+
+        // Table Head
+        self.start_tag_internal("thead")?;
+        self.finish_tag_internal()?;
+        self.raw_html_internal("\n")?;
+        self.start_tag_internal("tr")?;
+        self.finish_tag_internal()?;
+        self.raw_html_internal("\n")?;
+
+        // Write header cells
+        #[cfg(feature = "gfm")]
+        for (col_index, header_cell) in headers.iter().enumerate() {
+            self.start_tag_internal("th")?;
+
+            // Apply alignment styles if GFM is enabled
+            if self.options.enable_gfm && col_index < alignments.len() {
+                match alignments[col_index] {
+                    TableAlignment::Left => {
+                        self.attribute_internal("style", "text-align: left;")?;
+                    }
+                    TableAlignment::Center => {
+                        self.attribute_internal("style", "text-align: center;")?;
+                    }
+                    TableAlignment::Right => {
+                        self.attribute_internal("style", "text-align: right;")?;
+                    }
+                    TableAlignment::None => {}
+                }
             }
-            self.text("</")?;
-            self.text(&element.tag)?;
-            self.text(">")?;
+
+            self.finish_tag_internal()?;
+            self.write_node(header_cell)?;
+            self.end_tag_internal("th")?;
+            self.raw_html_internal("\n")?;
         }
+
+        #[cfg(not(feature = "gfm"))]
+        for header_cell in headers.iter() {
+            self.start_tag_internal("th")?;
+            self.finish_tag_internal()?;
+            self.write_node(header_cell)?;
+            self.end_tag_internal("th")?;
+            self.raw_html_internal("\n")?;
+        }
+        self.end_tag_internal("tr")?;
+        self.raw_html_internal("\n")?;
+        self.end_tag_internal("thead")?;
+        self.raw_html_internal("\n")?;
+
+        // Table Body
+        self.start_tag_internal("tbody")?;
+        self.finish_tag_internal()?;
+        self.raw_html_internal("\n")?;
+
+        // Process each row
+        for row_cells in rows {
+            self.start_tag_internal("tr")?;
+            self.finish_tag_internal()?;
+            self.raw_html_internal("\n")?;
+
+            // Process cells with alignment support when GFM is enabled
+            #[cfg(feature = "gfm")]
+            for (col_index, cell) in row_cells.iter().enumerate() {
+                self.start_tag_internal("td")?;
+
+                // Apply alignment styles if GFM is enabled
+                if self.options.enable_gfm && col_index < alignments.len() {
+                    match alignments[col_index] {
+                        TableAlignment::Left => {
+                            self.attribute_internal("style", "text-align: left;")?;
+                        }
+                        TableAlignment::Center => {
+                            self.attribute_internal("style", "text-align: center;")?;
+                        }
+                        TableAlignment::Right => {
+                            self.attribute_internal("style", "text-align: right;")?;
+                        }
+                        TableAlignment::None => {}
+                    }
+                }
+
+                self.finish_tag_internal()?;
+                self.write_node(cell)?;
+                self.end_tag_internal("td")?;
+                self.raw_html_internal("\n")?;
+            }
+
+            // Process cells normally when GFM is not enabled
+            #[cfg(not(feature = "gfm"))]
+            for cell in row_cells.iter() {
+                self.start_tag_internal("td")?;
+                self.finish_tag_internal()?;
+                self.write_node(cell)?;
+                self.end_tag_internal("td")?;
+                self.raw_html_internal("\n")?;
+            }
+
+            self.end_tag_internal("tr")?;
+            self.raw_html_internal("\n")?;
+        }
+
+        self.end_tag_internal("tbody")?;
+        self.raw_html_internal("\n")?;
+        self.end_tag_internal("table")?;
+        self.raw_html_internal("\n")?;
         Ok(())
     }
 
-    /// Flushes the buffer to the writer.
-    pub fn flush(&mut self) -> io::Result<()> {
-        if !self.buffer.is_empty() {
-            let result = self.writer.write_all(self.buffer.as_bytes());
-            self.buffer.clear();
-            result?
+    fn write_autolink_node(&mut self, url: &str, is_email: bool) -> HtmlWriteResult<()> {
+        self.start_tag_internal("a")?;
+        let href = if is_email && !url.starts_with("mailto:") {
+            format!("mailto:{}", url)
+        } else {
+            url.to_string()
+        };
+        self.attribute_internal("href", &href)?;
+        self.finish_tag_internal()?;
+        self.text_internal(url)?;
+        self.end_tag_internal("a")?;
+        Ok(())
+    }
+
+    #[cfg(feature = "gfm")]
+    fn write_extended_autolink_node(&mut self, url: &str) -> HtmlWriteResult<()> {
+        if !self.options.enable_gfm {
+            // Or a more specific gfm_autolinks option
+            log::warn!("ExtendedAutolink node encountered but GFM (or GFM autolinks) is not enabled. Rendering as plain text.");
+            self.text_internal(url)?;
+            return Ok(());
+        }
+        self.start_tag_internal("a")?;
+        self.attribute_internal("href", url)?; // Assumes URL is already a valid href
+        self.finish_tag_internal()?;
+        self.text_internal(url)?;
+        self.end_tag_internal("a")?;
+        Ok(())
+    }
+
+    fn write_reference_link_node(&mut self, label: &str, content: &[Node]) -> HtmlWriteResult<()> {
+        // HTML rendering expects links to be resolved. If a ReferenceLink node is still present,
+        // it means resolution failed or wasn't performed.
+        // CommonMark dictates rendering the source text.
+        if self.options.strict {
+            return Err(HtmlWriteError::UnsupportedNodeType(format!(
+                "Unresolved reference link '[{}{}]' found in strict mode. Pre-resolve links for HTML output.",
+                render_nodes_to_plain_text_string(content, &self.options), // Get text of content
+                label
+            )));
+        }
+
+        log::warn!(
+            "Unresolved reference link for label '{}'. Rendering as plain text.",
+            label
+        );
+        // Render as plain text: [content][label] or [label]
+        self.text_internal("[")?;
+        let content_text = render_nodes_to_plain_text_string(content, &self.options);
+        if content.is_empty() || content_text == label {
+            // Handle [label] and [label][]
+            self.text_internal(label)?;
+        } else {
+            // Handle [text][label]
+            // In this case, `content` is rendered as its textual representation inside the first brackets
+            // This might mean rendering resolved inline nodes within `content` as text.
+            for node_in_content in content {
+                self.write_node(node_in_content)?; // This will render HTML if content has e.g. <em>
+            }
+        }
+        self.text_internal("]")?; // Closing first bracket set
+                                  // If it's not a collapsed reference `[label]` and not `[text][]` (where label is implicitly text)
+                                  // then we need the `[label]` part.
+                                  // Shortcut `[label]` is already handled by `content_text == label`.
+                                  // Full `[text][label]` requires the second bracket.
+                                  // Collapsed `[text][]` implies label is derived from text, also handled.
+                                  // This logic can be tricky; CommonMark source rendering is the safest fallback.
+        if !(content_text == label && content.len() == 1 && matches!(content[0], Node::Text(_))) {
+            // Avoid double [label][label] if content was just Node::Text(label)
+            if !(content.is_empty() && label.is_empty()) {
+                // Avoids `[][]` if both are empty (unlikely)
+                // This part ensures `[label]` for `[text][label]` or `[label][]` forms
+                // if content is not simply the label text itself.
+                let is_explicit_full_or_collapsed_form = !content.is_empty(); // e.g. [foo][bar] or [baz][]
+                if is_explicit_full_or_collapsed_form {
+                    self.text_internal("[")?;
+                    self.text_internal(label)?; // The actual reference label
+                    self.text_internal("]")?;
+                }
+            }
         }
         Ok(())
     }
 }
 
-/// An extension trait for `Write` to provide a convenient `write_str` method.
-pub trait WriteExt: Write {
-    /// Writes a string slice to the writer.
-    fn write_str(&mut self, s: &str) -> io::Result<usize> {
-        self.write(s.as_bytes())
+impl Default for HtmlWriter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-impl<W: Write> WriteExt for W {}
-
-// Helper function to escape HTML to a provided string buffer
-fn escape_html_to_buffer(text: &str, buffer: &mut String) {
-    for ch in text.chars() {
-        match ch {
-            '&' => buffer.push_str("&amp;"),
-            '<' => buffer.push_str("&lt;"),
-            '>' => buffer.push_str("&gt;"),
-            '"' => buffer.push_str("&quot;"),
-            '\'' => buffer.push_str("&#39;"),
-            _ => buffer.push(ch),
-        }
-    }
-}
-
-// Helper function to render AST nodes to a plain text string for alt attributes
-fn render_nodes_to_plain_text(nodes: &[Node], buffer: &mut String, _options: &HtmlRenderOptions) {
+/// Helper function to render a slice of AST nodes to a plain text string.
+/// Used for 'alt' text in images or for textual representation of link content.
+fn render_nodes_to_plain_text(nodes: &[Node], buffer: &mut String, _options: &HtmlWriterOptions) {
     for node in nodes {
         match node {
             Node::Text(text) => buffer.push_str(text),
             Node::Emphasis(children) | Node::Strong(children) => {
                 render_nodes_to_plain_text(children, buffer, _options);
             }
-            Node::Link { content, .. } => {
-                render_nodes_to_plain_text(content, buffer, _options);
+            #[cfg(feature = "gfm")]
+            Node::Strikethrough(children) => {
+                render_nodes_to_plain_text(children, buffer, _options);
             }
-            Node::Image { alt, .. } => {
-                // Nested image in alt? Render its alt text.
-                render_nodes_to_plain_text(alt, buffer, _options);
-            }
+            Node::Link { content, .. } => render_nodes_to_plain_text(content, buffer, _options),
+            Node::Image { alt, .. } => render_nodes_to_plain_text(alt, buffer, _options), // Recursively get alt text
             Node::InlineCode(code) => buffer.push_str(code),
-            Node::SoftBreak => buffer.push(' '), // Replace soft breaks with a space
-            Node::HardBreak => buffer.push(' '), // Replace hard breaks with a space (alt text is usually single line)
+            Node::SoftBreak | Node::HardBreak => buffer.push(' '), // Represent breaks as spaces in alt text
             Node::HtmlElement(element) => {
-                // For HTML elements, try to get text content if any, or ignore.
-                // This is a simplification; proper textualization of HTML can be complex.
-                // Based on CommonMark Dingus, HTML tags are typically stripped.
-                if !element.children.is_empty() {
-                    render_nodes_to_plain_text(&element.children, buffer, _options);
-                }
+                // Strip HTML tags, but render their text content
+                render_nodes_to_plain_text(&element.children, buffer, _options);
             }
-            Node::Autolink { url, .. } => buffer.push_str(url),
-            Node::ExtendedAutolink(url) => buffer.push_str(url),
-            // Paragraphs and other block-level elements are unlikely/invalid directly in alt text.
-            // If they appear, recurse to find any text, but this is non-standard.
+            Node::Autolink { url, .. } | Node::ExtendedAutolink(url) => buffer.push_str(url),
+            // Block elements are generally not expected in contexts like 'alt' text,
+            // but if they are, extract their text content.
             Node::Paragraph(children)
             | Node::BlockQuote(children)
             | Node::Heading {
                 content: children, ..
             } => {
                 render_nodes_to_plain_text(children, buffer, _options);
+                buffer.push(' '); // Add a space after block content for readability
             }
-            // Other node types are generally ignored for plain text alt representation.
-            _ => {}
+            _ => {} // Ignore other node types (e.g., ThematicBreak, Table, List) for plain text rendering.
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Cursor;
-
-    #[test]
-    fn test_simple_html_generation() {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-
-        html_writer.start_tag("html").unwrap();
-        html_writer.finish_tag().unwrap(); // Explicitly finish tag
-        html_writer.start_tag("body").unwrap();
-        html_writer.finish_tag().unwrap();
-        html_writer.start_tag("h1").unwrap();
-        html_writer.finish_tag().unwrap();
-        html_writer.text("Hello & <world>!").unwrap();
-        html_writer.end_tag("h1").unwrap();
-        html_writer.end_tag("body").unwrap();
-        html_writer.end_tag("html").unwrap();
-        html_writer.flush().unwrap();
-
-        let output = String::from_utf8(buffer.into_inner()).unwrap();
-        assert_eq!(
-            output,
-            "<html><body><h1>Hello &amp; &lt;world&gt;!</h1></body></html>"
-        );
-    }
-
-    #[test]
-    fn test_text_escaping() {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-        // Text implicitly closes any open tag, so no explicit finish_tag needed before it.
-        html_writer
-            .text("Text with \"quotes\" and 'apostrophes' & special <chars>.")
-            .unwrap();
-        html_writer.flush().unwrap();
-        let output = String::from_utf8(buffer.into_inner()).unwrap();
-        assert_eq!(
-            output,
-            "Text with &quot;quotes&quot; and &#39;apostrophes&#39; &amp; special &lt;chars&gt;."
-        );
-    }
-
-    #[test]
-    fn test_attributes() {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-
-        html_writer.start_tag("p").unwrap();
-        html_writer.attribute("class", "greeting").unwrap();
-        html_writer.attribute("id", "main-greeting").unwrap();
-        html_writer.finish_tag().unwrap(); // Finish tag after attributes
-        html_writer.text("Hello with attributes!").unwrap();
-        html_writer.end_tag("p").unwrap();
-        html_writer.flush().unwrap();
-
-        let output = String::from_utf8(buffer.into_inner()).unwrap();
-        assert_eq!(
-            output,
-            "<p class=\"greeting\" id=\"main-greeting\">Hello with attributes!</p>"
-        );
-    }
-
-    #[test]
-    fn test_self_closing_tag() {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-
-        html_writer.self_closing_tag("br").unwrap();
-        html_writer.flush().unwrap();
-        let output = String::from_utf8(buffer.into_inner()).unwrap();
-        assert_eq!(output, "<br />");
-    }
-
-    #[test]
-    fn test_self_closing_tag_with_attributes() {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-
-        html_writer.start_tag("img").unwrap();
-        html_writer.attribute("src", "image.png").unwrap();
-        html_writer
-            .attribute("alt", "An example image with <special> chars & quotes \"")
-            .unwrap();
-        html_writer.finish_self_closing_tag().unwrap(); // Finish as self-closing
-        html_writer.flush().unwrap();
-
-        let output = String::from_utf8(buffer.into_inner()).unwrap();
-        assert_eq!(output, "<img src=\"image.png\" alt=\"An example image with &lt;special&gt; chars &amp; quotes &quot;\" />");
-    }
-
-    #[test]
-    fn test_mixed_content() {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-
-        html_writer.start_tag("div").unwrap();
-        html_writer.attribute("id", "container").unwrap();
-        // text() will call ensure_tag_closed -> finish_tag()
-        html_writer.text("Some leading text.").unwrap();
-
-        html_writer.start_tag("p").unwrap();
-        html_writer.text("A paragraph inside the div.").unwrap();
-        html_writer.end_tag("p").unwrap();
-
-        html_writer.self_closing_tag("hr").unwrap();
-
-        html_writer.start_tag("span").unwrap();
-        // No attributes, text will close it.
-        html_writer.text("More text.").unwrap();
-        html_writer.end_tag("span").unwrap();
-
-        html_writer.end_tag("div").unwrap();
-        html_writer.flush().unwrap();
-
-        let expected = "<div id=\"container\">Some leading text.<p>A paragraph inside the div.</p><hr /><span>More text.</span></div>";
-        let output = String::from_utf8(buffer.into_inner()).unwrap();
-        assert_eq!(output, expected);
-    }
-
-    #[test]
-    fn test_sequential_tags_without_content() {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-
-        html_writer.start_tag("div").unwrap();
-        html_writer.finish_tag().unwrap();
-        html_writer.start_tag("span").unwrap();
-        html_writer.finish_tag().unwrap();
-        html_writer.end_tag("span").unwrap();
-        html_writer.end_tag("div").unwrap();
-        html_writer.flush().unwrap();
-
-        assert_eq!(
-            String::from_utf8(buffer.into_inner()).unwrap(),
-            "<div><span></span></div>"
-        );
-    }
-
-    #[test]
-    fn test_empty_tag() {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-
-        html_writer.start_tag("p").unwrap();
-        html_writer.finish_tag().unwrap();
-        html_writer.end_tag("p").unwrap();
-        html_writer.flush().unwrap();
-
-        assert_eq!(String::from_utf8(buffer.into_inner()).unwrap(), "<p></p>");
-    }
-
-    #[test]
-    fn test_ensure_tag_closed_on_new_start_tag() {
-        let mut buffer = Cursor::new(Vec::new());
-        let mut html_writer = HtmlWriter::new(&mut buffer);
-
-        html_writer.start_tag("div").unwrap(); // <div
-        html_writer.attribute("class", "outer").unwrap(); // <div class="outer"
-        html_writer.start_tag("p").unwrap(); // Should close div: <div class="outer"><p
-        html_writer.text("hello").unwrap(); // <div class="outer"><p>hello
-        html_writer.end_tag("p").unwrap(); // <div class="outer"><p>hello</p>
-        html_writer.end_tag("div").unwrap(); // <div class="outer"><p>hello</p></div>
-        html_writer.flush().unwrap();
-
-        let expected = "<div class=\"outer\"><p>hello</p></div>";
-        assert_eq!(String::from_utf8(buffer.into_inner()).unwrap(), expected);
-    }
+/// Convenience wrapper for `render_nodes_to_plain_text` that returns a String.
+fn render_nodes_to_plain_text_string(nodes: &[Node], options: &HtmlWriterOptions) -> String {
+    let mut s = String::new();
+    render_nodes_to_plain_text(nodes, &mut s, options);
+    s
 }
+
+// Example of how CustomNode's html_write might be expected by the HtmlWriter:
+// (This would be part of the CustomNode trait definition and its implementations)
+// pub trait CustomNode {
+//     // ... other methods ...
+//     fn html_write(&self, options: &HtmlRenderOptions) -> Result<String, String>; // String for error msg
+// }
