@@ -882,10 +882,9 @@ impl CommonMarkWriter {
                 .map_err(|e| e.into_write_error())?;
         }
 
-        // 完成开始标签并处理自闭合标签
-        html_writer.finish_tag().map_err(|e| e.into_write_error())?;
 
         if !element.self_closing {
+            html_writer.finish_tag().map_err(|e| e.into_write_error())?;
             // 处理子节点
             if !element.children.is_empty() {
                 for child in &element.children {
@@ -898,6 +897,11 @@ impl CommonMarkWriter {
             // 添加结束标签
             html_writer
                 .end_tag(&element.tag)
+                .map_err(|e| e.into_write_error())?;
+        } else {
+            // 自闭合标签
+            html_writer
+                .finish_self_closing_tag()
                 .map_err(|e| e.into_write_error())?;
         }
 

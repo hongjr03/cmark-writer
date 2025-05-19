@@ -519,7 +519,7 @@ fn test_write_self_closing_html_element() {
     writer.write(&img).unwrap();
     assert_eq!(
         writer.into_string(),
-        "<img src=\"image.jpg\" alt=\"图片描述\">"
+        "<img src=\"image.jpg\" alt=\"图片描述\" />"
     );
 }
 

@@ -10,7 +10,6 @@ pub use crate::ast::{TableAlignment, TaskListStatus};
 pub use crate::options::WriterOptionsBuilder;
 
 pub mod formatting;
-pub mod html;
 pub mod tables;
 pub mod tasks;
 
