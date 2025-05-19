@@ -63,7 +63,7 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "cmark-writer-macros",
  "env_logger",
@@ -72,7 +72,7 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer-macros"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "proc-macro2",
  "quote",

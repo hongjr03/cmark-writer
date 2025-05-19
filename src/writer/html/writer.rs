@@ -48,10 +48,7 @@ impl<W: Write> HtmlWriter<W> {
     /// Must be called after `start_tag` and before `finish_tag`, `text`, or `end_tag`.
     pub fn attribute(&mut self, key: &str, value: &str) -> io::Result<()> {
         if !self.tag_opened {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "attribute called without an open tag",
-            ));
+            return Err(io::Error::other("attribute called without an open tag"));
         }
         self.buffer.push(' ');
         self.buffer.push_str(key);

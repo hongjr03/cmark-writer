@@ -2,6 +2,19 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.0] - 2025-05-19
+
+### Features
+
+- Added HTML writer functionality for more flexible HTML output
+- Added `HtmlRenderOptions` for controlling HTML rendering
+- Improved error handling mechanism with more detailed error messages
+
+### Improvements
+
+- Enhanced test cases with warning tests
+- Removed outdated documentation
+
 ## [0.6.3] - 2025-04-30
 
 ### Features
