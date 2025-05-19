@@ -868,39 +868,7 @@ impl CommonMarkWriter {
 
         let mut html_writer = HtmlWriter::with_options(html_options);
 
-        // 开始标签
-        html_writer
-            .start_tag(&element.tag)
-            .map_err(|e| e.into_write_error())?;
-
-        // 添加属性
-        for attr in &element.attributes {
-            html_writer
-                .attribute(&attr.name, &attr.value)
-                .map_err(|e| e.into_write_error())?;
-        }
-
-        if !element.self_closing {
-            html_writer.finish_tag().map_err(|e| e.into_write_error())?;
-            // 处理子节点
-            if !element.children.is_empty() {
-                for child in &element.children {
-                    html_writer
-                        .write_node(child)
-                        .map_err(|e| e.into_write_error())?;
-                }
-            }
-
-            // 添加结束标签
-            html_writer
-                .end_tag(&element.tag)
-                .map_err(|e| e.into_write_error())?;
-        } else {
-            // 自闭合标签
-            html_writer
-                .finish_self_closing_tag()
-                .map_err(|e| e.into_write_error())?;
-        }
+        html_writer.write_node(&Node::HtmlElement(element.clone()))?;
 
         // Get the generated HTML
         let html_output = html_writer.into_string();
