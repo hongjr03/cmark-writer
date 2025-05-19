@@ -873,21 +873,6 @@ impl CommonMarkWriter {
         // Get the generated HTML
         let html_output = html_writer.into_string();
 
-        // Handle GFM disallowed HTML tags
-        #[cfg(feature = "gfm")]
-        if self.options.enable_gfm
-            && !self.options.gfm_disallowed_html_tags.is_empty()
-            && self
-                .options
-                .gfm_disallowed_html_tags
-                .iter()
-                .any(|tag| tag.eq_ignore_ascii_case(&element.tag))
-        {
-            // If the tag is in the disallowed list, escape it as text
-            use html_escape;
-            return self.write_str(&html_escape::encode_text(&html_output));
-        }
-
         // Otherwise write the raw HTML
         self.write_str(&html_output)
     }
