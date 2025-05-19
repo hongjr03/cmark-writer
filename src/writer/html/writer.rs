@@ -1,10 +1,10 @@
-use crate::ast::{ListItem, Node}; // Using 'ast' module directly
+use super::utils::{is_safe_attribute_name, is_safe_tag_name};
+use super::{HtmlRenderOptions, HtmlWriteError, HtmlWriteResult};
+use crate::ast::{ListItem, Node};
 #[cfg(feature = "gfm")]
 use crate::ast::{TableAlignment, TaskListStatus};
-use std::io::{self, Write}; // GFM specific AST types
-                            // HtmlElement is part of ast::Node via ast::html::HtmlElement
-use super::utils::{is_safe_attribute_name, is_safe_tag_name};
-use super::{HtmlRenderOptions, HtmlWriteError, HtmlWriteResult}; // Corrected: Removed HtmlError // Added import for utils
+use log;
+use std::io::{self, Write};
 
 /// A writer for generating HTML output.
 ///
@@ -48,11 +48,10 @@ impl<W: Write> HtmlWriter<W> {
     /// Must be called after `start_tag` and before `finish_tag`, `text`, or `end_tag`.
     pub fn attribute(&mut self, key: &str, value: &str) -> io::Result<()> {
         if !self.tag_opened {
-            // This would be an error in usage, perhaps return a Result::Err
-            // For now, let's assume correct usage or ignore if no tag is open.
-            // Alternatively, panic or log an error.
-            // For robustness, one might return an error:
-            // return Err(io::Error::new(io::ErrorKind::Other, "attribute called without an open tag"));
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "attribute called without an open tag",
+            ));
         }
         self.buffer.push(' ');
         self.buffer.push_str(key);
@@ -173,6 +172,7 @@ impl<W: Write> HtmlWriter<W> {
             }
             Node::ThematicBreak => {
                 self.self_closing_tag("hr")?;
+                self.raw_html("\n")?;
                 Ok(())
             }
             Node::InlineCode(code) => {
@@ -194,8 +194,10 @@ impl<W: Write> HtmlWriter<W> {
                     }
                 }
                 self.finish_tag()?;
+
                 self.start_tag("code")?;
                 self.finish_tag()?;
+
                 self.text(content)?;
                 self.end_tag("code")?;
                 self.end_tag("pre")?;
@@ -213,65 +215,61 @@ impl<W: Write> HtmlWriter<W> {
                         .iter()
                         .any(|tag| tag.eq_ignore_ascii_case(&element.tag))
                 {
-                    // Render as escaped text
-                    self.text("<")?;
-                    self.text(&element.tag)?;
-                    for attr in &element.attributes {
-                        self.text(" ")?;
-                        self.text(&attr.name)?;
-                        self.text("=\"")?;
-                        self.text(&attr.value)?;
-                        self.text("\"")?;
-                    }
-                    if element.self_closing {
-                        self.text(" />")?;
-                    } else {
-                        self.text(">")?;
-                        for child in &element.children {
-                            // Children of a textualized HTML element are also textualized.
-                            // Re-evaluate if a dedicated text-rendering mode for write_node is needed
-                            // or if this recursive call correctly handles all cases by also textualizing sub-elements.
-                            self.write_node(child, options)?;
-                        }
-                        self.text("</")?;
-                        self.text(&element.tag)?;
-                        self.text(">")?;
-                    }
-                    return Ok(()); // Early exit for disallowed tags
+                    self.textualize_full_element(element, options)?;
+                    return Ok(());
                 }
 
-                // Normal HTML rendering (tag and attributes are not disallowed or GFM is off)
                 if !is_safe_tag_name(&element.tag) {
-                    // Use the error type from HtmlWriteError
-                    return Err(HtmlWriteError::InvalidHtmlTag(element.tag.clone()));
+                    if options.strict {
+                        return Err(HtmlWriteError::InvalidHtmlTag(element.tag.clone()));
+                    } else {
+                        log::warn!(
+                            "Invalid HTML tag name '{}' encountered. Textualizing entire element in non-strict mode.",
+                            element.tag
+                        );
+                        self.textualize_full_element(element, options)?;
+                        return Ok(());
+                    }
                 }
                 self.start_tag(&element.tag)?;
-
                 for attr in &element.attributes {
                     if !is_safe_attribute_name(&attr.name) {
-                        return Err(HtmlWriteError::InvalidHtmlAttribute(attr.name.clone()));
+                        if options.strict {
+                            return Err(HtmlWriteError::InvalidHtmlAttribute(attr.name.clone()));
+                        } else {
+                            log::warn!(
+                                "Invalid HTML attribute name '{}' in tag '{}' encountered. Textualizing attribute in non-strict mode.",
+                                attr.name, element.tag
+                            );
+                            self.text(" ")?;
+                            self.text(&attr.name)?;
+                            self.text("=")?;
+                            self.text("\"")?;
+                            self.text(&attr.value)?;
+                            self.text("\"")?;
+                            continue;
+                        }
                     }
-                    // HtmlWriter::attribute already handles value escaping
                     self.attribute(&attr.name, &attr.value)?;
                 }
-
                 if element.self_closing {
                     self.finish_self_closing_tag()?;
                 } else {
                     self.finish_tag()?;
                     for child in &element.children {
-                        self.write_node(child, options)?; // Children are rendered as HTML via normal recursion
+                        self.write_node(child, options)?;
                     }
                     self.end_tag(&element.tag)?;
                 }
                 Ok(())
             }
             Node::SoftBreak => {
-                self.text(" ")?;
+                self.raw_html("\n")?;
                 Ok(())
             }
             Node::HardBreak => {
                 self.self_closing_tag("br")?;
+                self.raw_html("\n")?;
                 Ok(())
             }
             Node::Link {
@@ -294,20 +292,15 @@ impl<W: Write> HtmlWriter<W> {
             Node::Image { url, title, alt } => {
                 self.start_tag("img")?;
                 self.attribute("src", url)?;
-                let mut alt_text = String::new();
-                for alt_node in alt {
-                    if let Node::Text(t) = alt_node {
-                        alt_text.push_str(t);
-                    } else {
-                        return Err(HtmlWriteError::InvalidStructure(
-                            "Image alt attribute should ideally only contain text nodes"
-                                .to_string(),
-                        ));
+
+                let mut alt_text_buffer = String::new();
+                render_nodes_to_plain_text(alt, &mut alt_text_buffer, options);
+                self.attribute("alt", &alt_text_buffer)?;
+
+                if let Some(t) = title {
+                    if !t.is_empty() {
+                        self.attribute("title", t)?;
                     }
-                }
-                self.attribute("alt", &alt_text)?;
-                if let Some(title_str) = title {
-                    self.attribute("title", title_str)?;
                 }
                 self.finish_self_closing_tag()?;
                 Ok(())
@@ -352,6 +345,85 @@ impl<W: Write> HtmlWriter<W> {
                 self.end_tag("del")?;
                 Ok(())
             }
+            Node::Table {
+                headers,
+                #[cfg(feature = "gfm")]
+                alignments,
+                rows,
+            } => {
+                self.start_tag("table")?;
+                self.finish_tag()?;
+
+                self.start_tag("thead")?;
+                self.finish_tag()?;
+                self.start_tag("tr")?;
+                self.finish_tag()?;
+                for (i_idx, header_node) in headers.iter().enumerate() {
+                    self.start_tag("th")?;
+                    #[cfg(feature = "gfm")]
+                    {
+                        if i_idx < alignments.len() {
+                            match alignments[i_idx] {
+                                crate::ast::TableAlignment::Left => {
+                                    self.attribute("style", "text-align: left;")?
+                                }
+                                crate::ast::TableAlignment::Center => {
+                                    self.attribute("style", "text-align: center;")?
+                                }
+                                crate::ast::TableAlignment::Right => {
+                                    self.attribute("style", "text-align: right;")?
+                                }
+                                crate::ast::TableAlignment::None => {}
+                            }
+                        }
+                    }
+                    #[cfg(not(feature = "gfm"))]
+                    let _ = i_idx;
+
+                    self.finish_tag()?;
+                    self.write_node(header_node, options)?;
+                    self.end_tag("th")?;
+                }
+                self.end_tag("tr")?;
+                self.end_tag("thead")?;
+
+                self.start_tag("tbody")?;
+                self.finish_tag()?;
+                for row_nodes in rows {
+                    self.start_tag("tr")?;
+                    self.finish_tag()?;
+                    for (c_idx, cell_node) in row_nodes.iter().enumerate() {
+                        self.start_tag("td")?;
+                        #[cfg(feature = "gfm")]
+                        {
+                            if c_idx < alignments.len() {
+                                match alignments[c_idx] {
+                                    crate::ast::TableAlignment::Left => {
+                                        self.attribute("style", "text-align: left;")?
+                                    }
+                                    crate::ast::TableAlignment::Center => {
+                                        self.attribute("style", "text-align: center;")?
+                                    }
+                                    crate::ast::TableAlignment::Right => {
+                                        self.attribute("style", "text-align: right;")?
+                                    }
+                                    crate::ast::TableAlignment::None => {}
+                                }
+                            }
+                        }
+                        #[cfg(not(feature = "gfm"))]
+                        let _ = c_idx;
+
+                        self.finish_tag()?;
+                        self.write_node(cell_node, options)?;
+                        self.end_tag("td")?;
+                    }
+                    self.end_tag("tr")?;
+                }
+                self.end_tag("tbody")?;
+                self.end_tag("table")?;
+                Ok(())
+            }
             Node::Autolink { url, is_email } => {
                 self.start_tag("a")?;
                 let href = if *is_email && !url.starts_with("mailto:") {
@@ -374,66 +446,36 @@ impl<W: Write> HtmlWriter<W> {
                 Ok(())
             }
             Node::LinkReferenceDefinition { .. } => Ok(()),
-            Node::Table { headers, rows, .. } => {
-                self.start_tag("table")?;
-                self.finish_tag()?;
-                self.start_tag("thead")?;
-                self.finish_tag()?;
-                self.start_tag("tr")?;
-                self.finish_tag()?;
-                for header_cell in headers {
-                    self.start_tag("th")?;
-                    self.finish_tag()?;
-                    self.write_node(header_cell, options)?;
-                    self.end_tag("th")?;
-                }
-                self.end_tag("tr")?;
-                self.end_tag("thead")?;
-                self.start_tag("tbody")?;
-                self.finish_tag()?;
-                for row_data in rows.iter() {
-                    self.start_tag("tr")?;
-                    self.finish_tag()?;
-                    for cell_node in row_data.iter() {
-                        self.start_tag("td")?;
-                        #[cfg(feature = "gfm")]
-                        {
-                            if let Node::Table { ref alignments, .. } = node {
-                                if _cell_idx < alignments.len() {
-                                    match alignments[_cell_idx] {
-                                        TableAlignment::Left => {
-                                            self.attribute("style", "text-align: left;")?;
-                                        }
-                                        TableAlignment::Center => {
-                                            self.attribute("style", "text-align: center;")?;
-                                        }
-                                        TableAlignment::Right => {
-                                            self.attribute("style", "text-align: right;")?;
-                                        }
-                                        TableAlignment::None => {}
-                                    }
-                                }
-                            }
-                        }
-                        self.finish_tag()?;
-                        self.write_node(cell_node, options)?;
-                        self.end_tag("td")?;
-                    }
-                    self.end_tag("tr")?;
-                }
-                self.end_tag("tbody")?;
-                self.end_tag("table")?;
-                Ok(())
-            }
             Node::ReferenceLink { label, content } => {
-                if content.is_empty() {
-                    self.text(label)?;
+                if options.strict {
+                    return Err(HtmlWriteError::UnsupportedNodeType(format!(
+                        "Unresolved reference link '{}' encountered in strict mode.",
+                        label
+                    )));
                 } else {
-                    for child in content {
-                        self.write_node(child, options)?;
+                    log::warn!(
+                        "Unresolved reference link '{}' encountered. Rendering as plain text.",
+                        label
+                    );
+                    self.text("[")?;
+                    if content.is_empty() {
+                        self.text(label)?;
+                    } else {
+                        for child in content {
+                            self.write_node(
+                                child,
+                                &HtmlRenderOptions {
+                                    strict: false,
+                                    ..options.clone()
+                                },
+                            )?;
+                        }
                     }
+                    self.text("][")?;
+                    self.text(label)?;
+                    self.text("]")?;
+                    Ok(())
                 }
-                Ok(())
             }
             Node::Custom(custom_node) => {
                 match custom_node.to_html_string(options) {
@@ -442,94 +484,144 @@ impl<W: Write> HtmlWriter<W> {
                 }
                 Ok(())
             }
-            other => {
-                let type_name = match other {
-                    Node::Document(_) => "Document",
-                    Node::ThematicBreak => "ThematicBreak",
-                    Node::Heading { .. } => "Heading",
-                    Node::CodeBlock { .. } => "CodeBlock",
-                    Node::HtmlBlock(_) => "HtmlBlock",
-                    Node::LinkReferenceDefinition { .. } => "LinkReferenceDefinition",
-                    Node::Paragraph(_) => "Paragraph",
-                    Node::BlockQuote(_) => "BlockQuote",
-                    Node::OrderedList { .. } => "OrderedList",
-                    Node::UnorderedList { .. } => "UnorderedList",
-                    Node::Table { .. } => "Table",
-                    Node::InlineCode(_) => "InlineCode",
-                    Node::Emphasis(_) => "Emphasis",
-                    Node::Strong(_) => "Strong",
-                    Node::Strikethrough(_) => "Strikethrough",
-                    Node::Link { .. } => "Link",
-                    Node::ReferenceLink { .. } => "ReferenceLink",
-                    Node::Image { .. } => "Image",
-                    Node::Autolink { .. } => "Autolink",
-                    Node::ExtendedAutolink(_) => "ExtendedAutolink",
-                    Node::HtmlElement(_) => "HtmlElement", // Should be caught by the specific arm
-                    Node::HardBreak => "HardBreak",
-                    Node::SoftBreak => "SoftBreak",
-                    Node::Text(_) => "Text",
-                    Node::Custom(_) => "Custom",
-                };
-                Err(HtmlWriteError::UnsupportedNodeType(format!(
-                    "Rendering not implemented for node type: {}",
-                    type_name
-                )))
-            }
+            other_node => Err(HtmlWriteError::UnsupportedNodeType(format!(
+                "Node type {:?} is not supported for HTML conversion.",
+                other_node // Display the specific unhandled Node variant
+            ))),
         }
     }
 
-    /// Helper function to write a `ListItem` node to HTML.
-    /// This is called by `write_node` when processing `OrderedList` or `UnorderedList`.
     fn write_list_item(
         &mut self,
-        list_item: &ListItem,
+        list_item: &ListItem, // Correct type from ast::ListItem
         options: &HtmlRenderOptions,
     ) -> HtmlWriteResult<()> {
-        let content_nodes = match list_item {
+        self.start_tag("li")?;
+
+        #[cfg(feature = "gfm")]
+        if let ListItem::Task { status, .. } = list_item {
+            if options.enable_gfm {
+                let class_name = if *status == TaskListStatus::Checked {
+                    "task-list-item task-list-item-checked"
+                } else {
+                    "task-list-item task-list-item-unchecked"
+                };
+                self.attribute("class", class_name)?;
+            }
+        }
+        self.finish_tag()?;
+
+        let item_content: &Vec<Node> = match list_item {
             ListItem::Unordered { content } => content,
             ListItem::Ordered { content, .. } => content,
             #[cfg(feature = "gfm")]
             ListItem::Task { content, .. } => content,
         };
 
-        self.start_tag("li")?;
-
         #[cfg(feature = "gfm")]
         if let ListItem::Task { status, .. } = list_item {
-            let class_name = if *status == TaskListStatus::Checked {
-                "task-list-item task-list-item-checked"
-            } else {
-                "task-list-item task-list-item-unchecked"
-            };
-            self.attribute("class", class_name)?;
-        }
-
-        self.finish_tag()?;
-
-        #[cfg(feature = "gfm")]
-        if let ListItem::Task { status, .. } = list_item {
-            self.start_tag("input")?;
-            self.attribute("type", "checkbox")?;
-            self.attribute("disabled", "")?;
-            if *status == TaskListStatus::Checked {
-                self.attribute("checked", "")?;
+            if options.enable_gfm {
+                self.start_tag("input")?;
+                self.attribute("type", "checkbox")?;
+                self.attribute("disabled", "")?;
+                if *status == TaskListStatus::Checked {
+                    self.attribute("checked", "")?;
+                }
+                self.finish_self_closing_tag()?;
+                self.raw_html(" ")?; // Space after checkbox before content
             }
-            self.finish_self_closing_tag()?;
-            self.raw_html(" ")?;
         }
 
-        for node_item in content_nodes {
-            self.write_node(node_item, options)?;
+        let mut contains_non_list_block = false;
+        let mut has_non_paragraph_direct_children = false;
+        let mut only_contains_sub_lists = true;
+
+        for child_node in item_content {
+            if !matches!(
+                child_node,
+                Node::OrderedList { .. } | Node::UnorderedList(..)
+            ) {
+                only_contains_sub_lists = false;
+            }
+            match child_node {
+                Node::Paragraph(_) => {
+                    contains_non_list_block = true;
+                }
+                Node::OrderedList { .. }
+                | Node::UnorderedList(..)
+                | Node::ThematicBreak
+                | Node::CodeBlock { .. }
+                | Node::HtmlBlock(_)
+                | Node::Heading { .. }
+                | Node::BlockQuote(_) => {
+                    contains_non_list_block = true;
+                }
+                _ => {
+                    has_non_paragraph_direct_children = true;
+                }
+            }
         }
+
+        if !item_content.is_empty()
+            && !contains_non_list_block
+            && has_non_paragraph_direct_children
+            && !only_contains_sub_lists
+        {
+            self.start_tag("p")?;
+            self.finish_tag()?;
+            for child_node in item_content {
+                self.write_node(child_node, options)?;
+            }
+            self.end_tag("p")?;
+        } else {
+            for child_node in item_content {
+                self.write_node(child_node, options)?;
+            }
+        }
+
         self.end_tag("li")?;
         Ok(())
     }
 
-    /// Flushes the internal buffer to the underlying writer.
+    /// Helper method to render an entire HTML element (tag, attributes, children) as escaped text.
+    /// This is used when a tag is disallowed (e.g., by GFM rules or due to unsafe characters in non-strict mode).
+    fn textualize_full_element(
+        &mut self,
+        element: &crate::ast::HtmlElement,
+        options: &HtmlRenderOptions,
+    ) -> HtmlWriteResult<()> {
+        self.text("<")?;
+        self.text(&element.tag)?;
+        for attr in &element.attributes {
+            self.text(" ")?;
+            self.text(&attr.name)?;
+            self.text("=")?;
+            self.text("\"")?;
+            self.text(&attr.value)?;
+            self.text("\"")?;
+        }
+        if element.self_closing {
+            self.text(" />")?;
+        } else {
+            self.text(">")?;
+            for child in &element.children {
+                self.write_node(child, options)?;
+            }
+            self.text("</")?;
+            self.text(&element.tag)?;
+            self.text(">")?;
+        }
+        Ok(())
+    }
+
+    /// Flushes the buffer to the writer.
     pub fn flush(&mut self) -> io::Result<()> {
-        self.writer.write_all(self.buffer.as_bytes())?;
-        self.buffer.clear();
-        self.writer.flush()
+        if !self.buffer.is_empty() {
+            let result = self.writer.write_all(self.buffer.as_bytes());
+            self.buffer.clear();
+            result?
+        }
+        Ok(())
     }
 }
 
@@ -545,14 +637,57 @@ impl<W: Write> WriteExt for W {}
 
 // Helper function to escape HTML to a provided string buffer
 fn escape_html_to_buffer(text: &str, buffer: &mut String) {
-    for c in text.chars() {
-        match c {
+    for ch in text.chars() {
+        match ch {
             '&' => buffer.push_str("&amp;"),
             '<' => buffer.push_str("&lt;"),
             '>' => buffer.push_str("&gt;"),
             '"' => buffer.push_str("&quot;"),
-            '\'' => buffer.push_str("&#39;"), // &apos; is not universally supported
-            _ => buffer.push(c),
+            '\'' => buffer.push_str("&#39;"),
+            _ => buffer.push(ch),
+        }
+    }
+}
+
+// Helper function to render AST nodes to a plain text string for alt attributes
+fn render_nodes_to_plain_text(nodes: &[Node], buffer: &mut String, options: &HtmlRenderOptions) {
+    for node in nodes {
+        match node {
+            Node::Text(text) => buffer.push_str(text),
+            Node::Emphasis(children) | Node::Strong(children) => {
+                render_nodes_to_plain_text(children, buffer, options);
+            }
+            Node::Link { content, .. } => {
+                render_nodes_to_plain_text(content, buffer, options);
+            }
+            Node::Image { alt, .. } => {
+                // Nested image in alt? Render its alt text.
+                render_nodes_to_plain_text(alt, buffer, options);
+            }
+            Node::InlineCode(code) => buffer.push_str(code),
+            Node::SoftBreak => buffer.push(' '), // Replace soft breaks with a space
+            Node::HardBreak => buffer.push(' '), // Replace hard breaks with a space (alt text is usually single line)
+            Node::HtmlElement(element) => {
+                // For HTML elements, try to get text content if any, or ignore.
+                // This is a simplification; proper textualization of HTML can be complex.
+                // Based on CommonMark Dingus, HTML tags are typically stripped.
+                if !element.children.is_empty() {
+                    render_nodes_to_plain_text(&element.children, buffer, options);
+                }
+            }
+            Node::Autolink { url, .. } => buffer.push_str(url),
+            Node::ExtendedAutolink(url) => buffer.push_str(url),
+            // Paragraphs and other block-level elements are unlikely/invalid directly in alt text.
+            // If they appear, recurse to find any text, but this is non-standard.
+            Node::Paragraph(children)
+            | Node::BlockQuote(children)
+            | Node::Heading {
+                content: children, ..
+            } => {
+                render_nodes_to_plain_text(children, buffer, options);
+            }
+            // Other node types are generally ignored for plain text alt representation.
+            _ => {}
         }
     }
 }

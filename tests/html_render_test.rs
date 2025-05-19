@@ -62,7 +62,7 @@ mod tests {
     #[test]
     fn test_thematic_break() {
         let node = Node::ThematicBreak;
-        let expected_html = "<hr />";
+        let expected_html = "<hr />\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
@@ -94,6 +94,7 @@ mod tests {
         };
         let options = HtmlRenderOptions {
             code_block_language_class_prefix: Some("lang-".to_string()),
+            strict: false,
         };
         let expected_html =
             "<pre class=\"lang-python\"><code>print(&quot;Hello&quot;)</code></pre>";
@@ -109,6 +110,7 @@ mod tests {
         };
         let options = HtmlRenderOptions {
             code_block_language_class_prefix: None,
+            strict: false,
         };
         // No class attribute should be present if prefix is None
         let expected_html = "<pre><code>let _ = 1;</code></pre>";
@@ -293,8 +295,12 @@ mod tests {
             label: "lbl".to_string(),
             content: vec![Node::Text("link text".to_string())],
         };
-        let expected_html = "link text";
-        assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
+        let options = HtmlRenderOptions {
+            strict: false,
+            ..HtmlRenderOptions::default()
+        };
+        let expected_html = "[link text][lbl]";
+        assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
     }
 
     #[test]
@@ -303,8 +309,12 @@ mod tests {
             label: "shortcut".to_string(),
             content: vec![], // Empty content means use label as text
         };
-        let expected_html = "shortcut";
-        assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
+        let options = HtmlRenderOptions {
+            strict: false,
+            ..HtmlRenderOptions::default()
+        };
+        let expected_html = "[shortcut][shortcut]";
+        assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
     }
 
     #[test]
