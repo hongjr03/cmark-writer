@@ -2,6 +2,20 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.1] - 2025-05-19
+
+### Changes
+
+- Refactored HtmlWriter.
+
+### Bug Fixes
+
+- Fixed HTML attribute value escaping in CommonMarkWriter
+
+### Documentation
+
+- Updated README.md to include examples of new custom macros
+
 ## [0.7.0] - 2025-05-19
 
 ### Features
