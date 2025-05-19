@@ -852,8 +852,6 @@ impl CommonMarkWriter {
             }
         }
 
-        // 创建一个临时的 HtmlWriter 实例来处理 HTML 元素
-        // 这样可以确保 HTML 格式的一致性
         use crate::writer::html::{HtmlWriter, HtmlWriterOptions};
 
         // 从 CommonMarkWriter 的选项中派生 HTML 渲染选项
@@ -881,7 +879,6 @@ impl CommonMarkWriter {
                 .attribute(&attr.name, &attr.value)
                 .map_err(|e| e.into_write_error())?;
         }
-
 
         if !element.self_closing {
             html_writer.finish_tag().map_err(|e| e.into_write_error())?;
