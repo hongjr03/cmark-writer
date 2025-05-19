@@ -838,6 +838,9 @@ impl CommonMarkWriter {
 
     /// Write an HTML element
     pub(crate) fn write_html_element(&mut self, element: &HtmlElement) -> WriteResult<()> {
+        #[cfg(feature = "gfm")]
+        let mut html_render_options = html::HtmlRenderOptions::default();
+        #[cfg(not(feature = "gfm"))]
         let html_render_options = html::HtmlRenderOptions::default();
 
         #[cfg(feature = "gfm")]

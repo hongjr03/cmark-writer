@@ -1,8 +1,8 @@
 use super::utils::{is_safe_attribute_name, is_safe_tag_name};
 use super::{HtmlRenderOptions, HtmlWriteError, HtmlWriteResult};
-use crate::ast::{ListItem, Node};
 #[cfg(feature = "gfm")]
-use crate::ast::{TableAlignment, TaskListStatus};
+use crate::ast::TaskListStatus;
+use crate::ast::{ListItem, Node};
 use log;
 use std::io::{self, Write};
 
@@ -484,9 +484,10 @@ impl<W: Write> HtmlWriter<W> {
                 }
                 Ok(())
             }
+            #[cfg(not(feature = "gfm"))]
             other_node => Err(HtmlWriteError::UnsupportedNodeType(format!(
                 "Node type {:?} is not supported for HTML conversion.",
-                other_node // Display the specific unhandled Node variant
+                other_node
             ))),
         }
     }
@@ -532,51 +533,9 @@ impl<W: Write> HtmlWriter<W> {
             }
         }
 
-        let mut contains_non_list_block = false;
-        let mut has_non_paragraph_direct_children = false;
-        let mut only_contains_sub_lists = true;
-
+        // Write content directly without wrapping in <p> for task list items
         for child_node in item_content {
-            if !matches!(
-                child_node,
-                Node::OrderedList { .. } | Node::UnorderedList(..)
-            ) {
-                only_contains_sub_lists = false;
-            }
-            match child_node {
-                Node::Paragraph(_) => {
-                    contains_non_list_block = true;
-                }
-                Node::OrderedList { .. }
-                | Node::UnorderedList(..)
-                | Node::ThematicBreak
-                | Node::CodeBlock { .. }
-                | Node::HtmlBlock(_)
-                | Node::Heading { .. }
-                | Node::BlockQuote(_) => {
-                    contains_non_list_block = true;
-                }
-                _ => {
-                    has_non_paragraph_direct_children = true;
-                }
-            }
-        }
-
-        if !item_content.is_empty()
-            && !contains_non_list_block
-            && has_non_paragraph_direct_children
-            && !only_contains_sub_lists
-        {
-            self.start_tag("p")?;
-            self.finish_tag()?;
-            for child_node in item_content {
-                self.write_node(child_node, options)?;
-            }
-            self.end_tag("p")?;
-        } else {
-            for child_node in item_content {
-                self.write_node(child_node, options)?;
-            }
+            self.write_node(child_node, options)?;
         }
 
         self.end_tag("li")?;

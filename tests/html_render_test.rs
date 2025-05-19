@@ -92,6 +92,13 @@ mod tests {
             content: "print(\"Hello\")".to_string(),
             block_type: Default::default(),
         };
+        #[cfg(feature = "gfm")]
+        let options = HtmlRenderOptions {
+            code_block_language_class_prefix: Some("lang-".to_string()),
+            strict: false,
+            ..Default::default()
+        };
+        #[cfg(not(feature = "gfm"))]
         let options = HtmlRenderOptions {
             code_block_language_class_prefix: Some("lang-".to_string()),
             strict: false,
@@ -108,6 +115,13 @@ mod tests {
             content: "let _ = 1;".to_string(),
             block_type: Default::default(),
         };
+        #[cfg(feature = "gfm")]
+        let options = HtmlRenderOptions {
+            code_block_language_class_prefix: None,
+            strict: false,
+            ..Default::default()
+        };
+        #[cfg(not(feature = "gfm"))]
         let options = HtmlRenderOptions {
             code_block_language_class_prefix: None,
             strict: false,
@@ -245,8 +259,12 @@ mod tests {
             content: vec![Node::Text("Done".to_string())],
         };
         let node = Node::UnorderedList(vec![unchecked_item, checked_item]);
+        let options = HtmlRenderOptions {
+            enable_gfm: true,
+            ..HtmlRenderOptions::default()
+        };
         let expected_html = "<ul><li class=\"task-list-item task-list-item-unchecked\"><input type=\"checkbox\" disabled=\"\" /> To do</li><li class=\"task-list-item task-list-item-checked\"><input type=\"checkbox\" disabled=\"\" checked=\"\" /> Done</li></ul>";
-        assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
+        assert_eq!(render_node_to_html(&node, &options).unwrap(), expected_html);
     }
 
     #[test]
@@ -361,7 +379,7 @@ mod tests {
                 Node::Text("R".to_string()),
             ]],
         };
-        let expected_html = "<table><thead><tr><th>H1</th><th>H2</th><th>H3</th></tr></thead><tbody><tr><td style=\"text-align: left;\">L</td><td style=\"text-align: center;\">C</td><td style=\"text-align: right;\">R</td></tr></tbody></table>";
+        let expected_html = "<table><thead><tr><th style=\"text-align: left;\">H1</th><th style=\"text-align: center;\">H2</th><th style=\"text-align: right;\">H3</th></tr></thead><tbody><tr><td style=\"text-align: left;\">L</td><td style=\"text-align: center;\">C</td><td style=\"text-align: right;\">R</td></tr></tbody></table>";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 

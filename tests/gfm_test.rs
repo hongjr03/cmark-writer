@@ -174,7 +174,7 @@ mod gfm_tests {
         let result = writer.into_string();
 
         // The script tag should be escaped to prevent execution
-        let expected = "Before script &lt;script type=\"text/javascript\"&gt;alert('test');&lt;/script&gt; after script.\n";
+        let expected = "Before script &lt;script type=&quot;text/javascript&quot;&gt;alert(&#39;test&#39;);&lt;/script&gt; after script.\n";
         assert_eq!(result, expected);
     }
 
