@@ -448,10 +448,10 @@ impl<W: Write> HtmlWriter<W> {
             Node::LinkReferenceDefinition { .. } => Ok(()),
             Node::ReferenceLink { label, content } => {
                 if options.strict {
-                    return Err(HtmlWriteError::UnsupportedNodeType(format!(
+                    Err(HtmlWriteError::UnsupportedNodeType(format!(
                         "Unresolved reference link '{}' encountered in strict mode.",
                         label
-                    )));
+                    )))
                 } else {
                     log::warn!(
                         "Unresolved reference link '{}' encountered. Rendering as plain text.",
@@ -650,19 +650,19 @@ fn escape_html_to_buffer(text: &str, buffer: &mut String) {
 }
 
 // Helper function to render AST nodes to a plain text string for alt attributes
-fn render_nodes_to_plain_text(nodes: &[Node], buffer: &mut String, options: &HtmlRenderOptions) {
+fn render_nodes_to_plain_text(nodes: &[Node], buffer: &mut String, _options: &HtmlRenderOptions) {
     for node in nodes {
         match node {
             Node::Text(text) => buffer.push_str(text),
             Node::Emphasis(children) | Node::Strong(children) => {
-                render_nodes_to_plain_text(children, buffer, options);
+                render_nodes_to_plain_text(children, buffer, _options);
             }
             Node::Link { content, .. } => {
-                render_nodes_to_plain_text(content, buffer, options);
+                render_nodes_to_plain_text(content, buffer, _options);
             }
             Node::Image { alt, .. } => {
                 // Nested image in alt? Render its alt text.
-                render_nodes_to_plain_text(alt, buffer, options);
+                render_nodes_to_plain_text(alt, buffer, _options);
             }
             Node::InlineCode(code) => buffer.push_str(code),
             Node::SoftBreak => buffer.push(' '), // Replace soft breaks with a space
@@ -672,7 +672,7 @@ fn render_nodes_to_plain_text(nodes: &[Node], buffer: &mut String, options: &Htm
                 // This is a simplification; proper textualization of HTML can be complex.
                 // Based on CommonMark Dingus, HTML tags are typically stripped.
                 if !element.children.is_empty() {
-                    render_nodes_to_plain_text(&element.children, buffer, options);
+                    render_nodes_to_plain_text(&element.children, buffer, _options);
                 }
             }
             Node::Autolink { url, .. } => buffer.push_str(url),
@@ -684,7 +684,7 @@ fn render_nodes_to_plain_text(nodes: &[Node], buffer: &mut String, options: &Htm
             | Node::Heading {
                 content: children, ..
             } => {
-                render_nodes_to_plain_text(children, buffer, options);
+                render_nodes_to_plain_text(children, buffer, _options);
             }
             // Other node types are generally ignored for plain text alt representation.
             _ => {}
