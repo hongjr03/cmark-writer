@@ -2,6 +2,12 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.5] - 2025-05-23
+
+### Changes
+
+- Refactored text escaping logic to use a trait-based approach which has better performance.
+
 ## [0.7.4] - 2025-05-23
 
 ### Changes
