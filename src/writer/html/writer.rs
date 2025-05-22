@@ -54,8 +54,11 @@ use html_escape;
 /// ```
 #[derive(Debug)]
 pub struct HtmlWriter {
-    options: HtmlWriterOptions,
+    /// Writer options
+    pub options: HtmlWriterOptions,
+    /// Buffer for storing the output text
     buffer: String,
+    /// Whether a tag is currently opened
     tag_opened: bool,
 }
 
