@@ -19,7 +19,9 @@ use super::processors::{
 /// This struct is responsible for serializing AST nodes to CommonMark-compliant text.
 #[derive(Debug)]
 pub struct CommonMarkWriter {
-    options: WriterOptions,
+    /// Writer options
+    pub options: WriterOptions,
+    /// Buffer for storing the output text
     buffer: String,
 }
 
@@ -837,14 +839,11 @@ impl CommonMarkWriter {
         &mut self,
         element: &crate::ast::HtmlElement,
     ) -> WriteResult<()> {
-        // 首先验证 HTML 标签和属性
         if self.options.strict {
-            // 检查标签名是否包含不安全字符
             if element.tag.contains('<') || element.tag.contains('>') {
                 return Err(WriteError::InvalidHtmlTag(element.tag.clone()));
             }
 
-            // 检查属性名是否包含不安全字符
             for attr in &element.attributes {
                 if attr.name.contains('<') || attr.name.contains('>') {
                     return Err(WriteError::InvalidHtmlAttribute(attr.name.clone()));
