@@ -2,6 +2,12 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.4] - 2025-05-23
+
+### Changes
+
+- Make `options` field of `CommonMarkWriter` and `HtmlWriter` public.
+
 ## [0.7.3] - 2025-05-19
 
 ### Changes
