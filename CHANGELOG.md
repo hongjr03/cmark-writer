@@ -2,6 +2,17 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.6] - 2025-06-14
+
+### Performance Improvements
+
+- Use EcoString instead of traditional string types for better performance
+- Optimized string processing and memory allocation
+
+### Dependencies
+
+- Added ecow dependency
+
 ## [0.7.5] - 2025-05-23
 
 ### Changes
