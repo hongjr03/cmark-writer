@@ -24,7 +24,7 @@ pub fn strikethrough(content: Vec<Node>) -> Node {
 /// # Returns
 /// A strikethrough node containing the text
 pub fn strike_text(text: &str) -> Node {
-    Node::Strikethrough(vec![Node::Text(text.to_string())])
+    Node::Strikethrough(vec![Node::Text(text.into())])
 }
 
 /// Creates a combined formatted node with strikethrough and emphasis
@@ -35,7 +35,7 @@ pub fn strike_text(text: &str) -> Node {
 /// # Returns
 /// A node with both strikethrough and emphasis formatting
 pub fn strike_and_emphasize(text: &str) -> Node {
-    Node::Strikethrough(vec![Node::Emphasis(vec![Node::Text(text.to_string())])])
+    Node::Strikethrough(vec![Node::Emphasis(vec![Node::Text(text.into())])])
 }
 
 /// Creates a combined formatted node with strikethrough and strong emphasis
@@ -46,5 +46,5 @@ pub fn strike_and_emphasize(text: &str) -> Node {
 /// # Returns
 /// A node with both strikethrough and strong emphasis formatting
 pub fn strike_and_strong(text: &str) -> Node {
-    Node::Strikethrough(vec![Node::Strong(vec![Node::Text(text.to_string())])])
+    Node::Strikethrough(vec![Node::Strong(vec![Node::Text(text.into())])])
 }

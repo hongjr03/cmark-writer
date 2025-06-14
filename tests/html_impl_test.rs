@@ -105,7 +105,7 @@ fn test_html_writer_options() {
         #[cfg(feature = "gfm")]
         enable_gfm: true,
         #[cfg(feature = "gfm")]
-        gfm_disallowed_html_tags: vec!["script".to_string()],
+        gfm_disallowed_html_tags: vec!["script".into()],
     };
 
     let mut writer = HtmlWriter::with_options(options);

@@ -174,7 +174,9 @@ impl CommonMarkWriter {
     pub(crate) fn check_no_newline(&self, node: &Node, context: &str) -> WriteResult<()> {
         if Self::node_contains_newline(node) {
             if self.is_strict_mode() {
-                return Err(WriteError::NewlineInInlineElement(context.to_string().into()));
+                return Err(WriteError::NewlineInInlineElement(
+                    context.to_string().into(),
+                ));
             } else {
                 log::warn!(
                     "Newline character found in inline element '{}', but non-strict mode allows it (output may be affected).",

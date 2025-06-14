@@ -25,9 +25,9 @@ mod gfm_tests {
     fn test_strikethrough() {
         // Create a paragraph with strikethrough text
         let node = Node::Paragraph(vec![
-            Node::Text("Normal text ".to_string()),
-            Node::Strikethrough(vec![Node::Text("struck through text".to_string())]),
-            Node::Text(" normal text again".to_string()),
+            Node::Text("Normal text ".into()),
+            Node::Strikethrough(vec![Node::Text("struck through text".into())]),
+            Node::Text(" normal text again".into()),
         ]);
 
         // Write with GFM enabled
@@ -47,15 +47,11 @@ mod gfm_tests {
             Node::UnorderedList(vec![
                 ListItem::Task {
                     status: TaskListStatus::Unchecked,
-                    content: vec![Node::Paragraph(vec![Node::Text(
-                        "Unchecked task".to_string(),
-                    )])],
+                    content: vec![Node::Paragraph(vec![Node::Text("Unchecked task".into())])],
                 },
                 ListItem::Task {
                     status: TaskListStatus::Checked,
-                    content: vec![Node::Paragraph(vec![Node::Text(
-                        "Completed task".to_string(),
-                    )])],
+                    content: vec![Node::Paragraph(vec![Node::Text("Completed task".into())])],
                 },
             ]),
             // Test with ordered lists too
@@ -65,13 +61,13 @@ mod gfm_tests {
                     ListItem::Task {
                         status: TaskListStatus::Unchecked,
                         content: vec![Node::Paragraph(vec![Node::Text(
-                            "Unchecked ordered task".to_string(),
+                            "Unchecked ordered task".into(),
                         )])],
                     },
                     ListItem::Task {
                         status: TaskListStatus::Checked,
                         content: vec![Node::Paragraph(vec![Node::Text(
-                            "Completed ordered task".to_string(),
+                            "Completed ordered task".into(),
                         )])],
                     },
                 ],
@@ -93,10 +89,10 @@ mod gfm_tests {
         // Create a table with different column alignments
         let node = Node::Table {
             headers: vec![
-                Node::Text("Left".to_string()),
-                Node::Text("Center".to_string()),
-                Node::Text("Right".to_string()),
-                Node::Text("Default".to_string()),
+                Node::Text("Left".into()),
+                Node::Text("Center".into()),
+                Node::Text("Right".into()),
+                Node::Text("Default".into()),
             ],
             alignments: vec![
                 TableAlignment::Left,
@@ -106,16 +102,16 @@ mod gfm_tests {
             ],
             rows: vec![
                 vec![
-                    Node::Text("L1".to_string()),
-                    Node::Text("C1".to_string()),
-                    Node::Text("R1".to_string()),
-                    Node::Text("D1".to_string()),
+                    Node::Text("L1".into()),
+                    Node::Text("C1".into()),
+                    Node::Text("R1".into()),
+                    Node::Text("D1".into()),
                 ],
                 vec![
-                    Node::Text("L2".to_string()),
-                    Node::Text("C2".to_string()),
-                    Node::Text("R2".to_string()),
-                    Node::Text("D2".to_string()),
+                    Node::Text("L2".into()),
+                    Node::Text("C2".into()),
+                    Node::Text("R2".into()),
+                    Node::Text("D2".into()),
                 ],
             ],
         };
@@ -134,9 +130,9 @@ mod gfm_tests {
     fn test_extended_autolink() {
         // Test autolinks without angle brackets
         let node = Node::Paragraph(vec![
-            Node::Text("Check this link: ".to_string()),
-            Node::ExtendedAutolink("https://example.com".to_string()),
-            Node::Text(" and continue reading.".to_string()),
+            Node::Text("Check this link: ".into()),
+            Node::ExtendedAutolink("https://example.com".into()),
+            Node::Text(" and continue reading.".into()),
         ]);
 
         // Write with GFM enabled
@@ -153,19 +149,19 @@ mod gfm_tests {
     fn test_html_filtering() {
         // Test with disallowed HTML tags (script)
         let script_element = HtmlElement {
-            tag: "script".to_string(),
+            tag: "script".into(),
             attributes: vec![HtmlAttribute {
-                name: "type".to_string(),
-                value: "text/javascript".to_string(),
+                name: "type".into(),
+                value: "text/javascript".into(),
             }],
-            children: vec![Node::Text("alert('test');".to_string())],
+            children: vec![Node::Text("alert('test');".into())],
             self_closing: false,
         };
 
         let node = Node::Paragraph(vec![
-            Node::Text("Before script ".to_string()),
+            Node::Text("Before script ".into()),
             Node::HtmlElement(script_element),
-            Node::Text(" after script.".to_string()),
+            Node::Text(" after script.".into()),
         ]);
 
         // Write with GFM enabled
@@ -182,19 +178,19 @@ mod gfm_tests {
     fn test_allowed_html() {
         // Test with allowed HTML tags (div)
         let div_element = HtmlElement {
-            tag: "div".to_string(),
+            tag: "div".into(),
             attributes: vec![HtmlAttribute {
-                name: "class".to_string(),
-                value: "container".to_string(),
+                name: "class".into(),
+                value: "container".into(),
             }],
-            children: vec![Node::Text("Content in div".to_string())],
+            children: vec![Node::Text("Content in div".into())],
             self_closing: false,
         };
 
         let node = Node::Paragraph(vec![
-            Node::Text("Before div ".to_string()),
+            Node::Text("Before div ".into()),
             Node::HtmlElement(div_element),
-            Node::Text(" after div.".to_string()),
+            Node::Text(" after div.".into()),
         ]);
 
         // Write with GFM enabled
@@ -212,15 +208,13 @@ mod gfm_tests {
         // Test factory methods for GFM elements
         let task = Node::task_list_item(
             TaskListStatus::Checked,
-            vec![Node::Paragraph(vec![Node::Text(
-                "A completed task".to_string(),
-            )])],
+            vec![Node::Paragraph(vec![Node::Text("A completed task".into())])],
         );
 
         let table = Node::table_with_alignment(
-            vec![Node::Text("Header".to_string())],
+            vec![Node::Text("Header".into())],
             vec![TableAlignment::Center],
-            vec![vec![Node::Text("Cell".to_string())]],
+            vec![vec![Node::Text("Cell".into())]],
         );
 
         let document = Node::Document(vec![task, table]);
@@ -240,13 +234,13 @@ mod gfm_tests {
         let node = Node::Document(vec![
             // Strikethrough
             Node::Paragraph(vec![Node::Strikethrough(vec![Node::Text(
-                "This should not have tildes when GFM is disabled".to_string(),
+                "This should not have tildes when GFM is disabled".into(),
             )])]),
             // Task list
             Node::UnorderedList(vec![ListItem::Task {
                 status: TaskListStatus::Checked,
                 content: vec![Node::Paragraph(vec![Node::Text(
-                    "No checkbox when disabled".to_string(),
+                    "No checkbox when disabled".into(),
                 )])],
             }]),
         ]);

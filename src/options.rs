@@ -2,6 +2,9 @@
 //!
 //! This module provides configuration options for the CommonMark writer.
 
+#[cfg(feature = "gfm")]
+use ecow::EcoString;
+
 /// CommonMark formatting options
 #[derive(Debug, Clone)]
 pub struct WriterOptions {
@@ -76,15 +79,15 @@ impl Default for WriterOptions {
 
             #[cfg(feature = "gfm")]
             gfm_disallowed_html_tags: vec![
-                "title".to_string(),
-                "textarea".to_string(),
-                "style".to_string(),
-                "xmp".to_string(),
-                "iframe".to_string(),
-                "noembed".to_string(),
-                "noframes".to_string(),
-                "script".to_string(),
-                "plaintext".to_string(),
+                "title".into(),
+                "textarea".into(),
+                "style".into(),
+                "xmp".into(),
+                "iframe".into(),
+                "noembed".into(),
+                "noframes".into(),
+                "script".into(),
+                "plaintext".into(),
             ],
         }
     }

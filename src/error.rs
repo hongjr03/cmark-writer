@@ -124,7 +124,10 @@ impl WriteError {
     }
 
     /// Create a new custom error with a message and error code
-    pub fn custom_with_code<S1: Into<EcoString>, S2: Into<EcoString>>(message: S1, code: S2) -> Self {
+    pub fn custom_with_code<S1: Into<EcoString>, S2: Into<EcoString>>(
+        message: S1,
+        code: S2,
+    ) -> Self {
         WriteError::Custom {
             message: message.into(),
             code: Some(code.into()),

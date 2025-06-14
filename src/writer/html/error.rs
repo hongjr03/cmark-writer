@@ -67,7 +67,9 @@ impl HtmlWriteError {
             },
             HtmlWriteError::InvalidStructure(msg) => WriteError::InvalidStructure(msg.into()),
             HtmlWriteError::InvalidHtmlTag(tag) => WriteError::InvalidHtmlTag(tag.into()),
-            HtmlWriteError::InvalidHtmlAttribute(attr) => WriteError::InvalidHtmlAttribute(attr.into()),
+            HtmlWriteError::InvalidHtmlAttribute(attr) => {
+                WriteError::InvalidHtmlAttribute(attr.into())
+            }
             HtmlWriteError::CustomNodeError(msg) => WriteError::Custom {
                 message: format!("Custom node error: {}", msg).into(),
                 code: None,

@@ -106,9 +106,7 @@ fn test_setext_heading_in_document() {
             content: vec![Node::Text("第二部分 (ATX)".into())],
             heading_type: HeadingType::Atx,
         },
-        Node::Paragraph(vec![Node::Text(
-            "这部分内容使用 ATX 风格的标题。".into(),
-        )]),
+        Node::Paragraph(vec![Node::Text("这部分内容使用 ATX 风格的标题。".into())]),
     ]);
 
     let mut writer = CommonMarkWriter::new();
