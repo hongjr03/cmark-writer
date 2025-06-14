@@ -4,8 +4,8 @@ mod tests {
     #[cfg(feature = "gfm")]
     use cmark_writer::ast::{TableAlignment, TaskListStatus};
     use cmark_writer::writer::{HtmlWriteResult, HtmlWriter, HtmlWriterOptions};
+    use ecow::EcoString;
     use log::{LevelFilter, Log};
-
     use std::sync::Once;
 
     static INIT: Once = Once::new();
@@ -49,7 +49,7 @@ mod tests {
     }
 
     // Helper function to render a node to string with given options
-    fn render_node_to_html(node: &Node, options: &HtmlWriterOptions) -> HtmlWriteResult<String> {
+    fn render_node_to_html(node: &Node, options: &HtmlWriterOptions) -> HtmlWriteResult<EcoString> {
         // Create HtmlWriter with the provided options
         let mut html_writer = HtmlWriter::with_options(options.clone());
         // Write the node to the writer
@@ -60,7 +60,7 @@ mod tests {
     }
 
     // Helper function to render a node to string with default options
-    fn render_node_to_html_default(node: &Node) -> HtmlWriteResult<String> {
+    fn render_node_to_html_default(node: &Node) -> HtmlWriteResult<EcoString> {
         render_node_to_html(
             node,
             #[cfg(feature = "gfm")]
@@ -72,14 +72,14 @@ mod tests {
 
     #[test]
     fn test_paragraph_and_text() {
-        let node = Node::Paragraph(vec![Node::Text("Hello HTML world!".to_string())]);
+        let node = Node::Paragraph(vec![Node::Text("Hello HTML world!".into())]);
         let expected_html = "<p>Hello HTML world!</p>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
 
     #[test]
     fn test_text_escaping() {
-        let node = Node::Paragraph(vec![Node::Text("Hello < & > \" ' world!".to_string())]);
+        let node = Node::Paragraph(vec![Node::Text("Hello < & > \" ' world!".into())]);
         let expected_html = "<p>Hello &lt; &amp; &gt; \" ' world!</p>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
@@ -88,7 +88,7 @@ mod tests {
     fn test_heading() {
         let node = Node::Heading {
             level: 1,
-            content: vec![Node::Text("Title".to_string())],
+            content: vec![Node::Text("Title".into())],
             heading_type: Default::default(),
         };
         let expected_html = "<h1>Title</h1>\n";
@@ -98,11 +98,11 @@ mod tests {
     #[test]
     fn test_emphasis_and_strong() {
         let node = Node::Paragraph(vec![
-            Node::Text("This is ".to_string()),
-            Node::Emphasis(vec![Node::Text("emphasized".to_string())]),
-            Node::Text(" and this is ".to_string()),
-            Node::Strong(vec![Node::Text("strong".to_string())]),
-            Node::Text("!".to_string()),
+            Node::Text("This is ".into()),
+            Node::Emphasis(vec![Node::Text("emphasized".into())]),
+            Node::Text(" and this is ".into()),
+            Node::Strong(vec![Node::Text("strong".into())]),
+            Node::Text("!".into()),
         ]);
         let expected_html =
             "<p>This is <em>emphasized</em> and this is <strong>strong</strong>!</p>\n";
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_inline_code() {
-        let node = Node::InlineCode("let x = 1;".to_string());
+        let node = Node::InlineCode("let x = 1;".into());
         let expected_html = "<code>let x = 1;</code>";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
@@ -126,8 +126,8 @@ mod tests {
     #[test]
     fn test_code_block_default_options() {
         let node = Node::CodeBlock {
-            language: Some("rust".to_string()),
-            content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+            language: Some("rust".into()),
+            content: "fn main() {\n    println!(\"Hello\");\n}".into(),
             block_type: Default::default(),
         };
         // Default prefix is "language-"
@@ -138,19 +138,19 @@ mod tests {
     #[test]
     fn test_code_block_custom_options() {
         let node = Node::CodeBlock {
-            language: Some("python".to_string()),
-            content: "print(\"Hello\")".to_string(),
+            language: Some("python".into()),
+            content: "print(\"Hello\")".into(),
             block_type: Default::default(),
         };
         #[cfg(feature = "gfm")]
         let options = HtmlWriterOptions {
-            code_block_language_class_prefix: Some("lang-".to_string()),
+            code_block_language_class_prefix: Some("lang-".into()),
             strict: false,
             ..Default::default()
         };
         #[cfg(not(feature = "gfm"))]
         let options = HtmlWriterOptions {
-            code_block_language_class_prefix: Some("lang-".to_string()),
+            code_block_language_class_prefix: Some("lang-".into()),
             strict: false,
         };
         let expected_html = "<pre><code class=\"lang-python\">print(\"Hello\")</code></pre>\n";
@@ -160,8 +160,8 @@ mod tests {
     #[test]
     fn test_code_block_no_prefix_option() {
         let node = Node::CodeBlock {
-            language: Some("rust".to_string()),
-            content: "let _ = 1;".to_string(),
+            language: Some("rust".into()),
+            content: "let _ = 1;".into(),
             block_type: Default::default(),
         };
         #[cfg(feature = "gfm")]
@@ -184,7 +184,7 @@ mod tests {
     fn test_code_block_no_language() {
         let node = Node::CodeBlock {
             language: None,
-            content: "plain text".to_string(),
+            content: "plain text".into(),
             block_type: Default::default(),
         };
         let expected_html = "<pre><code>plain text</code></pre>\n";
@@ -194,9 +194,9 @@ mod tests {
     #[test]
     fn test_link() {
         let node = Node::Link {
-            url: "https://example.com".to_string(),
-            title: Some("Example Domain".to_string()),
-            content: vec![Node::Text("Visit Example".to_string())],
+            url: "https://example.com".into(),
+            title: Some("Example Domain".into()),
+            content: vec![Node::Text("Visit Example".into())],
         };
         let expected_html =
             "<a href=\"https://example.com\" title=\"Example Domain\">Visit Example</a>";
@@ -206,9 +206,9 @@ mod tests {
     #[test]
     fn test_image() {
         let node = Node::Image {
-            url: "/logo.png".to_string(),
-            title: Some("Logo".to_string()),
-            alt: vec![Node::Text("Site Logo".to_string())],
+            url: "/logo.png".into(),
+            title: Some("Logo".into()),
+            alt: vec![Node::Text("Site Logo".into())],
         };
         let expected_html = "<img src=\"/logo.png\" alt=\"Site Logo\" title=\"Logo\" />";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
@@ -218,10 +218,10 @@ mod tests {
     fn test_unordered_list() {
         let node = Node::UnorderedList(vec![
             ListItem::Unordered {
-                content: vec![Node::Paragraph(vec![Node::Text("Item 1".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("Item 1".into())])],
             },
             ListItem::Unordered {
-                content: vec![Node::Paragraph(vec![Node::Text("Item 2".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("Item 2".into())])],
             },
         ]);
         let expected_html = "<ul>\n<li><p>Item 1</p>\n</li>\n<li><p>Item 2</p>\n</li>\n</ul>\n";
@@ -235,11 +235,11 @@ mod tests {
             items: vec![
                 ListItem::Ordered {
                     number: None,
-                    content: vec![Node::Paragraph(vec![Node::Text("Item A".to_string())])],
+                    content: vec![Node::Paragraph(vec![Node::Text("Item A".into())])],
                 },
                 ListItem::Ordered {
                     number: Some(5),
-                    content: vec![Node::Paragraph(vec![Node::Text("Item B".to_string())])],
+                    content: vec![Node::Paragraph(vec![Node::Text("Item B".into())])],
                 },
             ],
         };
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_html_block() {
-        let node = Node::HtmlBlock("<div class=\"foo\">Bar</div>".to_string());
+        let node = Node::HtmlBlock("<div class=\"foo\">Bar</div>".into());
         let expected_html = "<div class=\"foo\">Bar</div>\n";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
@@ -260,12 +260,12 @@ mod tests {
     #[test]
     fn test_html_element() {
         let element = HtmlElement {
-            tag: "my-custom-tag".to_string(),
+            tag: "my-custom-tag".into(),
             attributes: vec![cmark_writer::ast::HtmlAttribute {
-                name: "data-val".to_string(),
-                value: "xyz".to_string(),
+                name: "data-val".into(),
+                value: "xyz".into(),
             }],
-            children: vec![Node::Text("Content".to_string())],
+            children: vec![Node::Text("Content".into())],
             self_closing: false,
         };
         let node = Node::HtmlElement(element);
@@ -276,10 +276,10 @@ mod tests {
     #[test]
     fn test_self_closing_html_element() {
         let element = HtmlElement {
-            tag: "hr".to_string(),
+            tag: "hr".into(),
             attributes: vec![cmark_writer::ast::HtmlAttribute {
-                name: "class".to_string(),
-                value: "fancy".to_string(),
+                name: "class".into(),
+                value: "fancy".into(),
             }],
             children: vec![],
             self_closing: true,
@@ -292,7 +292,7 @@ mod tests {
     #[cfg(feature = "gfm")]
     #[test]
     fn test_strikethrough_gfm() {
-        let node = Node::Strikethrough(vec![Node::Text("deleted".to_string())]);
+        let node = Node::Strikethrough(vec![Node::Text("deleted".into())]);
         let expected_html = "<del>deleted</del>";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
@@ -302,11 +302,11 @@ mod tests {
     fn test_task_list_item_gfm() {
         let unchecked_item = ListItem::Task {
             status: TaskListStatus::Unchecked,
-            content: vec![Node::Text("To do".to_string())],
+            content: vec![Node::Text("To do".into())],
         };
         let checked_item = ListItem::Task {
             status: TaskListStatus::Checked,
-            content: vec![Node::Text("Done".to_string())],
+            content: vec![Node::Text("Done".into())],
         };
         let node = Node::UnorderedList(vec![unchecked_item, checked_item]);
         let options = HtmlWriterOptions {
@@ -320,8 +320,8 @@ mod tests {
     #[test]
     fn test_blockquote() {
         let node = Node::BlockQuote(vec![
-            Node::Paragraph(vec![Node::Text("This is a quote.".to_string())]),
-            Node::Paragraph(vec![Node::Text("Another paragraph in quote.".to_string())]),
+            Node::Paragraph(vec![Node::Text("This is a quote.".into())]),
+            Node::Paragraph(vec![Node::Text("Another paragraph in quote.".into())]),
         ]);
         let expected_html =
             "<blockquote>\n<p>This is a quote.</p>\n<p>Another paragraph in quote.</p>\n</blockquote>\n";
@@ -331,7 +331,7 @@ mod tests {
     #[test]
     fn test_autolink_uri() {
         let node = Node::Autolink {
-            url: "https://example.com".to_string(),
+            url: "https://example.com".into(),
             is_email: false,
         };
         let expected_html = "<a href=\"https://example.com\">https://example.com</a>";
@@ -341,7 +341,7 @@ mod tests {
     #[test]
     fn test_autolink_email() {
         let node = Node::Autolink {
-            url: "test@example.com".to_string(),
+            url: "test@example.com".into(),
             is_email: true,
         };
         let expected_html = "<a href=\"mailto:test@example.com\">test@example.com</a>";
@@ -352,7 +352,7 @@ mod tests {
     #[cfg(feature = "gfm")]
     fn test_extended_autolink() {
         // GFM, but our Node::ExtendedAutolink is not conditional
-        let node = Node::ExtendedAutolink("www.example.com/path".to_string());
+        let node = Node::ExtendedAutolink("www.example.com/path".into());
         let expected_html = "<a href=\"www.example.com/path\">www.example.com/path</a>";
         assert_eq!(render_node_to_html_default(&node).unwrap(), expected_html);
     }
@@ -361,8 +361,8 @@ mod tests {
     fn test_reference_link_full() {
         // Assuming ReferenceLink implies it was not resolved, so renders as text.
         let node = Node::ReferenceLink {
-            label: "lbl".to_string(),
-            content: vec![Node::Text("link text".to_string())],
+            label: "lbl".into(),
+            content: vec![Node::Text("link text".into())],
         };
         let options = HtmlWriterOptions {
             strict: false,
@@ -375,7 +375,7 @@ mod tests {
     #[test]
     fn test_reference_link_shortcut() {
         let node = Node::ReferenceLink {
-            label: "shortcut".to_string(),
+            label: "shortcut".into(),
             content: vec![], // Empty content means use label as text
         };
         let options = HtmlWriterOptions {
@@ -389,21 +389,12 @@ mod tests {
     #[test]
     fn test_table_basic() {
         let node = Node::Table {
-            headers: vec![
-                Node::Text("Header 1".to_string()),
-                Node::Text("Header 2".to_string()),
-            ],
+            headers: vec![Node::Text("Header 1".into()), Node::Text("Header 2".into())],
             #[cfg(feature = "gfm")]
             alignments: vec![], // No specific GFM alignment for this basic test
             rows: vec![
-                vec![
-                    Node::Text("Cell 1.1".to_string()),
-                    Node::Text("Cell 1.2".to_string()),
-                ],
-                vec![
-                    Node::Text("Cell 2.1".to_string()),
-                    Node::Text("Cell 2.2".to_string()),
-                ],
+                vec![Node::Text("Cell 1.1".into()), Node::Text("Cell 1.2".into())],
+                vec![Node::Text("Cell 2.1".into()), Node::Text("Cell 2.2".into())],
             ],
         };
         let expected_html = "<table>\n<thead>\n<tr>\n<th>Header 1</th>\n<th>Header 2</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>Cell 1.1</td>\n<td>Cell 1.2</td>\n</tr>\n<tr>\n<td>Cell 2.1</td>\n<td>Cell 2.2</td>\n</tr>\n</tbody>\n</table>\n";
@@ -415,9 +406,9 @@ mod tests {
     fn test_table_with_gfm_alignment() {
         let node = Node::Table {
             headers: vec![
-                Node::Text("H1".to_string()),
-                Node::Text("H2".to_string()),
-                Node::Text("H3".to_string()),
+                Node::Text("H1".into()),
+                Node::Text("H2".into()),
+                Node::Text("H3".into()),
             ],
             alignments: vec![
                 TableAlignment::Left,
@@ -425,9 +416,9 @@ mod tests {
                 TableAlignment::Right,
             ],
             rows: vec![vec![
-                Node::Text("L".to_string()),
-                Node::Text("C".to_string()),
-                Node::Text("R".to_string()),
+                Node::Text("L".into()),
+                Node::Text("C".into()),
+                Node::Text("R".into()),
             ]],
         };
         let expected_html = "<table>\n<thead>\n<tr>\n<th style=\"text-align: left;\">H1</th>\n<th style=\"text-align: center;\">H2</th>\n<th style=\"text-align: right;\">H3</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td style=\"text-align: left;\">L</td>\n<td style=\"text-align: center;\">C</td>\n<td style=\"text-align: right;\">R</td>\n</tr>\n</tbody>\n</table>\n";
@@ -440,9 +431,9 @@ mod tests {
 
         // 测试无效的 HTML 标签
         let element = HtmlElement {
-            tag: "invalid<tag>".to_string(),
+            tag: "invalid<tag>".into(),
             attributes: vec![],
-            children: vec![Node::Text("Content".to_string())],
+            children: vec![Node::Text("Content".into())],
             self_closing: false,
         };
         let node = Node::HtmlElement(element);
@@ -463,12 +454,12 @@ mod tests {
     #[test]
     fn test_invalid_html_attribute_non_strict() {
         let element = HtmlElement {
-            tag: "div".to_string(),
+            tag: "div".into(),
             attributes: vec![cmark_writer::ast::HtmlAttribute {
-                name: "invalid<attr>".to_string(),
-                value: "value".to_string(),
+                name: "invalid<attr>".into(),
+                value: "value".into(),
             }],
-            children: vec![Node::Text("Content".to_string())],
+            children: vec![Node::Text("Content".into())],
             self_closing: false,
         };
         let node = Node::HtmlElement(element);
@@ -484,9 +475,9 @@ mod tests {
     #[test]
     fn test_disallowed_html_tag_gfm() {
         let element = HtmlElement {
-            tag: "script".to_string(),
+            tag: "script".into(),
             attributes: vec![],
-            children: vec![Node::Text("alert('test')".to_string())],
+            children: vec![Node::Text("alert('test')".into())],
             self_closing: false,
         };
         let node = Node::HtmlElement(element);
@@ -501,8 +492,8 @@ mod tests {
     #[test]
     fn test_reference_link_warning() {
         let node = Node::ReferenceLink {
-            label: "unresolved".to_string(),
-            content: vec![Node::Text("Unresolved Link".to_string())],
+            label: "unresolved".into(),
+            content: vec![Node::Text("Unresolved Link".into())],
         };
         let options = HtmlWriterOptions {
             strict: false,
@@ -519,15 +510,15 @@ mod tests {
 
         // 测试 GFM 模式下被禁用的 HTML 标签
         let element = HtmlElement {
-            tag: "script".to_string(),
+            tag: "script".into(),
             attributes: vec![],
-            children: vec![Node::Text("alert('test')".to_string())],
+            children: vec![Node::Text("alert('test')".into())],
             self_closing: false,
         };
         let node = Node::HtmlElement(element);
         let options = HtmlWriterOptions {
             enable_gfm: true,
-            gfm_disallowed_html_tags: vec!["script".to_string()],
+            gfm_disallowed_html_tags: vec!["script".into()],
             ..HtmlWriterOptions::default()
         };
 

@@ -1,11 +1,10 @@
+use super::{utils, HtmlWriteError, HtmlWriteResult, HtmlWriterOptions};
 use crate::ast::{HtmlElement, ListItem, Node};
-use log;
-
 #[cfg(feature = "gfm")]
 use crate::ast::{TableAlignment, TaskListStatus};
-
-use super::{utils, HtmlWriteError, HtmlWriteResult, HtmlWriterOptions};
+use ecow::EcoString;
 use html_escape;
+use log;
 
 /// HTML writer for serializing CommonMark AST nodes to HTML.
 ///
@@ -23,7 +22,7 @@ use html_escape;
 /// use cmark_writer::{HtmlWriter, Node};
 ///
 /// let mut writer = HtmlWriter::new();
-/// let para = Node::Paragraph(vec![Node::Text("Hello, world!".to_string())]);
+/// let para = Node::Paragraph(vec![Node::Text("Hello, world!".into())]);
 /// writer.write_node(&para).unwrap();
 ///
 /// let output = writer.into_string();
@@ -57,7 +56,7 @@ pub struct HtmlWriter {
     /// Writer options
     pub options: HtmlWriterOptions,
     /// Buffer for storing the output text
-    buffer: String,
+    buffer: EcoString,
     /// Whether a tag is currently opened
     tag_opened: bool,
 }
@@ -72,13 +71,13 @@ impl HtmlWriter {
     pub fn with_options(options: HtmlWriterOptions) -> Self {
         HtmlWriter {
             options,
-            buffer: String::new(),
+            buffer: EcoString::new(),
             tag_opened: false,
         }
     }
 
     /// Consumes the writer and returns the generated HTML string.
-    pub fn into_string(mut self) -> String {
+    pub fn into_string(mut self) -> EcoString {
         self.ensure_tag_closed().unwrap();
         self.buffer
     }
@@ -366,7 +365,7 @@ impl HtmlWriter {
 
     fn write_code_block_node(
         &mut self,
-        language: &Option<String>,
+        language: &Option<EcoString>,
         content: &str,
     ) -> HtmlWriteResult<()> {
         self.start_tag_internal("pre")?;
@@ -411,7 +410,7 @@ impl HtmlWriter {
 
         if !utils::is_safe_tag_name(&element.tag) {
             if self.options.strict {
-                return Err(HtmlWriteError::InvalidHtmlTag(element.tag.clone()));
+                return Err(HtmlWriteError::InvalidHtmlTag(element.tag.to_string()));
             } else {
                 log::warn!(
                     "Invalid HTML tag name '{}' encountered. Textualizing in non-strict mode.",
@@ -426,7 +425,7 @@ impl HtmlWriter {
         for attr in &element.attributes {
             if !utils::is_safe_attribute_name(&attr.name) {
                 if self.options.strict {
-                    return Err(HtmlWriteError::InvalidHtmlAttribute(attr.name.clone()));
+                    return Err(HtmlWriteError::InvalidHtmlAttribute(attr.name.to_string()));
                 } else {
                     log::warn!("Invalid HTML attribute name '{}' in tag '{}'. Textualizing attribute in non-strict mode.", attr.name, element.tag);
                     // Simple textualization of the attribute itself
@@ -497,7 +496,7 @@ impl HtmlWriter {
     fn write_link_node(
         &mut self,
         url: &str,
-        title: &Option<String>,
+        title: &Option<EcoString>,
         content: &[Node],
     ) -> HtmlWriteResult<()> {
         self.start_tag_internal("a")?;
@@ -518,12 +517,12 @@ impl HtmlWriter {
     fn write_image_node(
         &mut self,
         url: &str,
-        title: &Option<String>,
+        title: &Option<EcoString>,
         alt: &[Node],
     ) -> HtmlWriteResult<()> {
         self.start_tag_internal("img")?;
         self.attribute_internal("src", url)?;
-        let mut alt_text_buffer = String::new();
+        let mut alt_text_buffer = EcoString::new();
         render_nodes_to_plain_text(alt, &mut alt_text_buffer, &self.options);
         self.attribute_internal("alt", &alt_text_buffer)?;
         if let Some(title_str) = title {
@@ -867,7 +866,11 @@ impl Default for HtmlWriter {
 
 /// Helper function to render a slice of AST nodes to a plain text string.
 /// Used for 'alt' text in images or for textual representation of link content.
-fn render_nodes_to_plain_text(nodes: &[Node], buffer: &mut String, _options: &HtmlWriterOptions) {
+fn render_nodes_to_plain_text(
+    nodes: &[Node],
+    buffer: &mut EcoString,
+    _options: &HtmlWriterOptions,
+) {
     for node in nodes {
         match node {
             Node::Text(text) => buffer.push_str(text),
@@ -902,9 +905,9 @@ fn render_nodes_to_plain_text(nodes: &[Node], buffer: &mut String, _options: &Ht
     }
 }
 
-/// Convenience wrapper for `render_nodes_to_plain_text` that returns a String.
-fn render_nodes_to_plain_text_string(nodes: &[Node], options: &HtmlWriterOptions) -> String {
-    let mut s = String::new();
+/// Convenience wrapper for `render_nodes_to_plain_text` that returns a EcoString.
+fn render_nodes_to_plain_text_string(nodes: &[Node], options: &HtmlWriterOptions) -> EcoString {
+    let mut s = EcoString::new();
     render_nodes_to_plain_text(nodes, &mut s, options);
     s
 }
@@ -913,5 +916,5 @@ fn render_nodes_to_plain_text_string(nodes: &[Node], options: &HtmlWriterOptions
 // (This would be part of the CustomNode trait definition and its implementations)
 // pub trait CustomNode {
 //     // ... other methods ...
-//     fn html_write(&self, options: &HtmlRenderOptions) -> Result<String, String>; // String for error msg
+//     fn html_write(&self, options: &HtmlRenderOptions) -> Result<EcoString, EcoString>; // EcoString for error msg
 // }

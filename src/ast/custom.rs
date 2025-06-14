@@ -17,6 +17,7 @@ use std::any::Any;
 /// # Example
 ///
 /// ```rust
+/// use ecow::EcoString;
 /// use cmark_writer_macros::custom_node;
 /// use cmark_writer::CommonMarkWriter;
 /// use cmark_writer::writer::HtmlWriter;
@@ -27,8 +28,8 @@ use std::any::Any;
 /// #[derive(Debug, Clone, PartialEq)]
 /// #[custom_node(block=false, html_impl=true)]
 /// struct HighlightNode {
-///     content: String,
-///     color: String,
+///     content: EcoString,
+///     color: EcoString,
 /// }
 ///
 /// impl HighlightNode {

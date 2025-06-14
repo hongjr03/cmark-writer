@@ -2,17 +2,17 @@
 //!
 //! This file contains the implementation of the CommonMarkWriter class, which serializes AST nodes to CommonMark-compliant text.
 
+use super::processors::{
+    BlockNodeProcessor, CustomNodeProcessor, InlineNodeProcessor, NodeProcessor,
+};
 #[cfg(feature = "gfm")]
 use crate::ast::TableAlignment;
 use crate::ast::{CodeBlockType, CustomNode, HeadingType, ListItem, Node};
 use crate::error::{WriteError, WriteResult};
 use crate::options::WriterOptions;
+use ecow::EcoString;
 use log;
 use std::fmt::{self};
-
-use super::processors::{
-    BlockNodeProcessor, CustomNodeProcessor, InlineNodeProcessor, NodeProcessor,
-};
 
 /// CommonMark writer
 ///
@@ -22,7 +22,7 @@ pub struct CommonMarkWriter {
     /// Writer options
     pub options: WriterOptions,
     /// Buffer for storing the output text
-    buffer: String,
+    buffer: EcoString,
 }
 
 impl CommonMarkWriter {
@@ -35,7 +35,7 @@ impl CommonMarkWriter {
     /// use cmark_writer::ast::Node;
     ///
     /// let mut writer = CommonMarkWriter::new();
-    /// writer.write(&Node::Text("Hello".to_string())).unwrap();
+    /// writer.write(&Node::Text("Hello".into())).unwrap();
     /// assert_eq!(writer.into_string(), "Hello");
     /// ```
     pub fn new() -> Self {
@@ -65,7 +65,7 @@ impl CommonMarkWriter {
     pub fn with_options(options: WriterOptions) -> Self {
         Self {
             options,
-            buffer: String::new(),
+            buffer: EcoString::new(),
         }
     }
 
@@ -85,12 +85,17 @@ impl CommonMarkWriter {
     /// # Returns
     ///
     /// Returns a string with applied indentation
-    fn apply_prefix(&self, content: &str, prefix: &str, first_line_prefix: Option<&str>) -> String {
+    fn apply_prefix(
+        &self,
+        content: &str,
+        prefix: &str,
+        first_line_prefix: Option<&str>,
+    ) -> EcoString {
         if content.is_empty() {
-            return String::new();
+            return EcoString::new();
         }
 
-        let mut result = String::new();
+        let mut result = EcoString::new();
         let lines: Vec<&str> = content.lines().collect();
 
         if !lines.is_empty() {
@@ -125,7 +130,7 @@ impl CommonMarkWriter {
     /// use cmark_writer::ast::Node;
     ///
     /// let mut writer = CommonMarkWriter::new();
-    /// writer.write(&Node::Text("Hello".to_string())).unwrap();
+    /// writer.write(&Node::Text("Hello".into())).unwrap();
     /// ```
     pub fn write(&mut self, node: &Node) -> WriteResult<()> {
         if let Node::Custom(_) = node {
@@ -149,19 +154,19 @@ impl CommonMarkWriter {
     }
 
     /// Get context description for a node, used for error reporting
-    pub(crate) fn get_context_for_node(&self, node: &Node) -> String {
+    pub(crate) fn get_context_for_node(&self, node: &Node) -> EcoString {
         match node {
-            Node::Text(_) => "Text".to_string(),
-            Node::Emphasis(_) => "Emphasis".to_string(),
-            Node::Strong(_) => "Strong".to_string(),
+            Node::Text(_) => "Text".into(),
+            Node::Emphasis(_) => "Emphasis".into(),
+            Node::Strong(_) => "Strong".into(),
             #[cfg(feature = "gfm")]
-            Node::Strikethrough(_) => "Strikethrough".to_string(),
-            Node::InlineCode(_) => "InlineCode".to_string(),
-            Node::Link { .. } => "Link content".to_string(),
-            Node::Image { .. } => "Image alt text".to_string(),
-            Node::HtmlElement(_) => "HtmlElement content".to_string(),
-            Node::Custom(_) => "Custom node".to_string(),
-            _ => "Unknown inline element".to_string(),
+            Node::Strikethrough(_) => "Strikethrough".into(),
+            Node::InlineCode(_) => "InlineCode".into(),
+            Node::Link { .. } => "Link content".into(),
+            Node::Image { .. } => "Image alt text".into(),
+            Node::HtmlElement(_) => "HtmlElement content".into(),
+            Node::Custom(_) => "Custom node".into(),
+            _ => "Unknown inline element".into(),
         }
     }
 
@@ -169,7 +174,7 @@ impl CommonMarkWriter {
     pub(crate) fn check_no_newline(&self, node: &Node, context: &str) -> WriteResult<()> {
         if Self::node_contains_newline(node) {
             if self.is_strict_mode() {
-                return Err(WriteError::NewlineInInlineElement(context.to_string()));
+                return Err(WriteError::NewlineInInlineElement(context.to_string().into()));
             } else {
                 log::warn!(
                     "Newline character found in inline element '{}', but non-strict mode allows it (output may be affected).",
@@ -352,7 +357,7 @@ impl CommonMarkWriter {
     /// Write a code block node
     pub(crate) fn write_code_block(
         &mut self,
-        language: &Option<String>,
+        language: &Option<EcoString>,
         content: &str,
         block_type: &CodeBlockType,
     ) -> WriteResult<()> {
@@ -614,7 +619,7 @@ impl CommonMarkWriter {
     pub(crate) fn write_link(
         &mut self,
         url: &str,
-        title: &Option<String>,
+        title: &Option<EcoString>,
         content: &[Node],
     ) -> WriteResult<()> {
         for node in content {
@@ -643,7 +648,7 @@ impl CommonMarkWriter {
     pub(crate) fn write_image(
         &mut self,
         url: &str,
-        title: &Option<String>,
+        title: &Option<EcoString>,
         alt: &[Node],
     ) -> WriteResult<()> {
         // Check for newlines in alt text content
@@ -700,7 +705,7 @@ impl CommonMarkWriter {
         if url.contains('\n') {
             if self.is_strict_mode() {
                 return Err(WriteError::NewlineInInlineElement(
-                    "Autolink URL".to_string(),
+                    "Autolink URL".to_string().into(),
                 ));
             } else {
                 log::warn!(
@@ -741,7 +746,7 @@ impl CommonMarkWriter {
             if self.is_strict_mode() {
                 // Or a specific gfm_autolinks_strict option if desired
                 return Err(WriteError::NewlineInInlineElement(
-                    "Extended Autolink URL".to_string(),
+                    "Extended Autolink URL".to_string().into(),
                 ));
             } else {
                 log::warn!(
@@ -763,7 +768,7 @@ impl CommonMarkWriter {
         &mut self,
         label: &str,
         destination: &str,
-        title: &Option<String>,
+        title: &Option<EcoString>,
     ) -> WriteResult<()> {
         // Format: [label]: destination "optional title"
         self.write_char('[')?;
@@ -849,7 +854,7 @@ impl CommonMarkWriter {
             // 使用相同的严格模式设置
             strict: self.options.strict,
             // 代码块语言类前缀，保持默认
-            code_block_language_class_prefix: Some("language-".to_string()),
+            code_block_language_class_prefix: Some("language-".into()),
             #[cfg(feature = "gfm")]
             enable_gfm: self.options.enable_gfm,
             #[cfg(feature = "gfm")]
@@ -878,11 +883,11 @@ impl CommonMarkWriter {
     /// use cmark_writer::ast::Node;
     ///
     /// let mut writer = CommonMarkWriter::new();
-    /// writer.write(&Node::Text("Hello".to_string())).unwrap();
+    /// writer.write(&Node::Text("Hello".into())).unwrap();
     /// let result = writer.into_string();
     /// assert_eq!(result, "Hello");
     /// ```
-    pub fn into_string(self) -> String {
+    pub fn into_string(self) -> EcoString {
         self.buffer
     }
 

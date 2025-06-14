@@ -44,7 +44,7 @@ pub struct WriterOptions {
 
     /// List of disallowed HTML tag names in GFM mode
     #[cfg(feature = "gfm")]
-    pub gfm_disallowed_html_tags: Vec<String>,
+    pub gfm_disallowed_html_tags: Vec<EcoString>,
 }
 
 impl Default for WriterOptions {
@@ -212,7 +212,7 @@ impl WriterOptionsBuilder {
 
     /// Set list of disallowed HTML tags in GFM mode
     #[cfg(feature = "gfm")]
-    pub fn gfm_disallowed_html_tags(mut self, tags: Vec<String>) -> Self {
+    pub fn gfm_disallowed_html_tags(mut self, tags: Vec<EcoString>) -> Self {
         self.options.gfm_disallowed_html_tags = tags;
         self
     }

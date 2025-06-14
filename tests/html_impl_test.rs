@@ -2,13 +2,14 @@ use cmark_writer::{
     custom_node, CommonMarkWriter, HtmlWriteResult, HtmlWriter, HtmlWriterOptions, Node,
     WriteResult,
 };
+use ecow::EcoString;
 
 // 1. 自定义节点，明确指定 html_impl=true，使用自定义 HTML 实现
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node(block = false, html_impl = true)]
 struct ColoredTextWithHtmlImpl {
-    text: String,
-    color: String,
+    text: EcoString,
+    color: EcoString,
 }
 
 impl ColoredTextWithHtmlImpl {
@@ -37,8 +38,8 @@ impl ColoredTextWithHtmlImpl {
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node(block = false)]
 struct ColoredTextWithoutHtmlImpl {
-    text: String,
-    color: String,
+    text: EcoString,
+    color: EcoString,
 }
 
 impl ColoredTextWithoutHtmlImpl {
@@ -59,8 +60,8 @@ impl ColoredTextWithoutHtmlImpl {
 fn test_html_impl_parameter() {
     // 1. 测试使用 html_impl = true 的节点
     let colored_with_impl = ColoredTextWithHtmlImpl {
-        text: "Hello, custom HTML!".to_string(),
-        color: "#ff0000".to_string(),
+        text: "Hello, custom HTML!".into(),
+        color: "#ff0000".into(),
     };
 
     let mut html_writer = HtmlWriter::new();
@@ -76,8 +77,8 @@ fn test_html_impl_parameter() {
 
     // 2. 测试不使用 html_impl 的节点
     let colored_without_impl = ColoredTextWithoutHtmlImpl {
-        text: "Hello, default HTML!".to_string(),
-        color: "#00ff00".to_string(),
+        text: "Hello, default HTML!".into(),
+        color: "#00ff00".into(),
     };
 
     let mut html_writer = HtmlWriter::new();
@@ -100,7 +101,7 @@ fn test_html_writer_options() {
     // 测试配置选项影响 HTML 输出
     let options = HtmlWriterOptions {
         strict: true,
-        code_block_language_class_prefix: Some("language-".to_string()),
+        code_block_language_class_prefix: Some("language-".into()),
         #[cfg(feature = "gfm")]
         enable_gfm: true,
         #[cfg(feature = "gfm")]
@@ -111,8 +112,8 @@ fn test_html_writer_options() {
 
     // 测试代码块渲染
     let code_block = Node::CodeBlock {
-        language: Some("rust".to_string()),
-        content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+        language: Some("rust".into()),
+        content: "fn main() {\n    println!(\"Hello\");\n}".into(),
         block_type: Default::default(),
     };
 

@@ -2,6 +2,7 @@
 
 use super::custom::CustomNode;
 use super::html::HtmlElement;
+use ecow::EcoString;
 use std::boxed::Box;
 
 /// Code block type according to CommonMark specification
@@ -75,26 +76,26 @@ pub enum Node {
     /// Code block, containing optional language identifier and content
     CodeBlock {
         /// Optional language identifier (None for indented code blocks, Some for fenced code blocks)
-        language: Option<String>,
+        language: Option<EcoString>,
         /// Code content
-        content: String,
+        content: EcoString,
         /// The type of code block (Indented or Fenced)
         block_type: CodeBlockType,
     },
 
     // HTML blocks
     /// HTML block
-    HtmlBlock(String),
+    HtmlBlock(EcoString),
 
     // Link reference definitions
     /// Link reference definition
     LinkReferenceDefinition {
         /// Link label (used for reference)
-        label: String,
+        label: EcoString,
         /// Link destination URL
-        destination: String,
+        destination: EcoString,
         /// Optional link title
-        title: Option<String>,
+        title: Option<EcoString>,
     },
 
     // Paragraphs
@@ -134,7 +135,7 @@ pub enum Node {
     // Inlines
     // Code spans
     /// Inline code
-    InlineCode(String),
+    InlineCode(EcoString),
 
     // Emphasis and strong emphasis
     /// Emphasis (italic)
@@ -150,9 +151,9 @@ pub enum Node {
     /// Link
     Link {
         /// Link URL
-        url: String,
+        url: EcoString,
         /// Optional link title
-        title: Option<String>,
+        title: Option<EcoString>,
         /// Link text
         content: Vec<Node>,
     },
@@ -160,7 +161,7 @@ pub enum Node {
     /// Reference link
     ReferenceLink {
         /// Link reference label
-        label: String,
+        label: EcoString,
         /// Link text content (optional, if empty it's a shortcut reference)
         content: Vec<Node>,
     },
@@ -169,9 +170,9 @@ pub enum Node {
     /// Image
     Image {
         /// Image URL
-        url: String,
+        url: EcoString,
         /// Optional image title
-        title: Option<String>,
+        title: Option<EcoString>,
         /// Alternative text, containing inline elements
         alt: Vec<Node>,
     },
@@ -180,13 +181,13 @@ pub enum Node {
     /// Autolink (URI or email wrapped in < and >)
     Autolink {
         /// Link URL
-        url: String,
+        url: EcoString,
         /// Whether this is an email autolink
         is_email: bool,
     },
 
     /// GFM Extended Autolink (without angle brackets, automatically detected)
-    ExtendedAutolink(String),
+    ExtendedAutolink(EcoString),
 
     // Raw HTML
     /// HTML inline element
@@ -202,7 +203,7 @@ pub enum Node {
 
     // Textual content
     /// Plain text
-    Text(String),
+    Text(EcoString),
 
     /// Custom node that allows users to implement their own writing behavior
     Custom(Box<dyn CustomNode>),
@@ -317,7 +318,7 @@ impl Node {
     ///
     /// # Returns
     /// A new code block node, default Fenced type
-    pub fn code_block(language: Option<String>, content: String) -> Self {
+    pub fn code_block(language: Option<EcoString>, content: EcoString) -> Self {
         Node::CodeBlock {
             language,
             content,

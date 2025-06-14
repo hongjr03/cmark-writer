@@ -4,21 +4,22 @@
 //! along with utilities for safely handling HTML content.
 
 use super::Node;
+use ecow::EcoString;
 
 /// HTML attribute
 #[derive(Debug, Clone, PartialEq)]
 pub struct HtmlAttribute {
     /// Attribute name
-    pub name: String,
+    pub name: EcoString,
     /// Attribute value
-    pub value: String,
+    pub value: EcoString,
 }
 
 /// HTML element
 #[derive(Debug, Clone, PartialEq)]
 pub struct HtmlElement {
     /// HTML tag name
-    pub tag: String,
+    pub tag: EcoString,
     /// HTML attributes
     pub attributes: Vec<HtmlAttribute>,
     /// Child nodes
@@ -31,7 +32,7 @@ impl HtmlElement {
     /// Create a new HTML element
     pub fn new(tag: &str) -> Self {
         Self {
-            tag: tag.to_string(),
+            tag: tag.into(),
             attributes: Vec::new(),
             children: Vec::new(),
             self_closing: false,
@@ -41,8 +42,8 @@ impl HtmlElement {
     /// Add an attribute to the HTML element
     pub fn with_attribute(mut self, name: &str, value: &str) -> Self {
         self.attributes.push(HtmlAttribute {
-            name: name.to_string(),
-            value: value.to_string(),
+            name: name.into(),
+            value: value.into(),
         });
         self
     }
@@ -51,8 +52,8 @@ impl HtmlElement {
     pub fn with_attributes(mut self, attrs: Vec<(&str, &str)>) -> Self {
         for (name, value) in attrs {
             self.attributes.push(HtmlAttribute {
-                name: name.to_string(),
-                value: value.to_string(),
+                name: name.into(),
+                value: value.into(),
             });
         }
         self
@@ -71,7 +72,7 @@ impl HtmlElement {
     }
 
     /// Check if this element's tag matches any in the provided list (case-insensitive)
-    pub fn tag_matches_any(&self, tags: &[String]) -> bool {
+    pub fn tag_matches_any(&self, tags: &[EcoString]) -> bool {
         tags.iter().any(|tag| tag.eq_ignore_ascii_case(&self.tag))
     }
 }

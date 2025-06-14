@@ -7,13 +7,13 @@ fn test_simple_document() {
     let document = Node::Document(vec![
         Node::Heading {
             level: 1,
-            content: vec![Node::Text("Title".to_string())],
+            content: vec![Node::Text("Title".into())],
             heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![
-            Node::Text("Regular text ".to_string()),
-            Node::Strong(vec![Node::Text("bold text".to_string())]),
-            Node::Text(" regular text".to_string()),
+            Node::Text("Regular text ".into()),
+            Node::Strong(vec![Node::Text("bold text".into())]),
+            Node::Text(" regular text".into()),
         ]),
     ]);
 
@@ -38,20 +38,20 @@ fn test_complex_document() {
     let document = Node::Document(vec![
         Node::Heading {
             level: 2,
-            content: vec![Node::Text("List Example".to_string())],
+            content: vec![Node::Text("List Example".into())],
             heading_type: HeadingType::Atx,
         },
         Node::UnorderedList(vec![
             ListItem::Unordered {
-                content: vec![Node::Paragraph(vec![Node::Text("Item 1".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("Item 1".into())])],
             },
             ListItem::Unordered {
-                content: vec![Node::Paragraph(vec![Node::Text("Item 2".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("Item 2".into())])],
             },
         ]),
         Node::CodeBlock {
-            language: Some("rust".to_string()),
-            content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+            language: Some("rust".into()),
+            content: "fn main() {\n    println!(\"Hello\");\n}".into(),
             block_type: CodeBlockType::Fenced,
         },
     ]);

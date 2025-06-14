@@ -3,6 +3,8 @@
 //! This module provides error types and implementations for handling errors
 //! that can occur during CommonMark writing.
 
+use ecow::EcoString;
+
 use crate::writer::html::error::HtmlWriteError as CoreHtmlWriteError;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -14,27 +16,27 @@ pub enum WriteError {
     /// An invalid heading level was encountered (must be 1-6).
     InvalidHeadingLevel(u8),
     /// A newline character was found in an inline element where it's not allowed (e.g., in strict mode or specific contexts like table cells, link text, image alt text).
-    NewlineInInlineElement(String),
+    NewlineInInlineElement(EcoString),
     /// An underlying formatting error occurred.
-    FmtError(String),
+    FmtError(EcoString),
     /// An underlying I/O error occurred.
     IoError(io::Error),
     /// An unsupported node type was encountered.
     UnsupportedNodeType,
     /// Invalid structure in a node (e.g., mismatched table columns)
-    InvalidStructure(String),
+    InvalidStructure(EcoString),
     /// An invalid HTML tag was found (contains unsafe characters)
-    InvalidHtmlTag(String),
+    InvalidHtmlTag(EcoString),
     /// An invalid HTML attribute was found (contains unsafe characters)
-    InvalidHtmlAttribute(String),
+    InvalidHtmlAttribute(EcoString),
     /// An error occurred during dedicated HTML rendering.
     HtmlRenderingError(CoreHtmlWriteError),
     /// A custom error with a message and optional error code.
     Custom {
         /// Custom error message
-        message: String,
+        message: EcoString,
         /// Optional error code for programmatic identification
-        code: Option<String>,
+        code: Option<EcoString>,
     },
 }
 
@@ -84,7 +86,7 @@ impl Error for WriteError {}
 // Allow converting fmt::Error into WriteError for convenience when using `?`
 impl From<fmt::Error> for WriteError {
     fn from(err: fmt::Error) -> Self {
-        WriteError::FmtError(err.to_string())
+        WriteError::FmtError(err.to_string().into())
     }
 }
 
@@ -99,9 +101,9 @@ impl From<io::Error> for WriteError {
 impl From<CoreHtmlWriteError> for WriteError {
     fn from(err: CoreHtmlWriteError) -> Self {
         match err {
-            CoreHtmlWriteError::InvalidHtmlTag(tag) => WriteError::InvalidHtmlTag(tag),
+            CoreHtmlWriteError::InvalidHtmlTag(tag) => WriteError::InvalidHtmlTag(tag.into()),
             CoreHtmlWriteError::InvalidHtmlAttribute(attr) => {
-                WriteError::InvalidHtmlAttribute(attr)
+                WriteError::InvalidHtmlAttribute(attr.into())
             }
             other_html_err => WriteError::HtmlRenderingError(other_html_err),
         }
@@ -114,7 +116,7 @@ pub type WriteResult<T> = Result<T, WriteError>;
 /// Convenience methods for creating custom errors
 impl WriteError {
     /// Create a new custom error with a message
-    pub fn custom<S: Into<String>>(message: S) -> Self {
+    pub fn custom<S: Into<EcoString>>(message: S) -> Self {
         WriteError::Custom {
             message: message.into(),
             code: None,
@@ -122,7 +124,7 @@ impl WriteError {
     }
 
     /// Create a new custom error with a message and error code
-    pub fn custom_with_code<S1: Into<String>, S2: Into<String>>(message: S1, code: S2) -> Self {
+    pub fn custom_with_code<S1: Into<EcoString>, S2: Into<EcoString>>(message: S1, code: S2) -> Self {
         WriteError::Custom {
             message: message.into(),
             code: Some(code.into()),
@@ -142,14 +144,14 @@ pub trait CustomErrorFactory {
 /// Struct to create structure errors with formatted messages
 pub struct StructureError {
     /// Format string for the error message
-    format: String,
+    format: EcoString,
     /// Arguments for formatting
-    args: Vec<String>,
+    args: Vec<EcoString>,
 }
 
 impl StructureError {
     /// Create a new structure error with a format string and arguments
-    pub fn new<S: Into<String>>(format: S) -> Self {
+    pub fn new<S: Into<EcoString>>(format: S) -> Self {
         Self {
             format: format.into(),
             args: Vec::new(),
@@ -157,7 +159,7 @@ impl StructureError {
     }
 
     /// Add an argument to the format string
-    pub fn arg<S: Into<String>>(mut self, arg: S) -> Self {
+    pub fn arg<S: Into<EcoString>>(mut self, arg: S) -> Self {
         self.args.push(arg.into());
         self
     }
@@ -169,13 +171,13 @@ impl CustomErrorFactory for StructureError {
             0 => self.format.clone(),
             1 => self.format.replace("{}", &self.args[0]),
             _ => {
-                let mut result = self.format.clone();
+                let mut result = self.format.to_string();
                 for arg in &self.args {
                     if let Some(pos) = result.find("{}") {
                         result.replace_range(pos..pos + 2, arg);
                     }
                 }
-                result
+                EcoString::from(result)
             }
         };
 
@@ -186,14 +188,14 @@ impl CustomErrorFactory for StructureError {
 /// Struct to create custom errors with codes
 pub struct CodedError {
     /// The error message
-    message: String,
+    message: EcoString,
     /// The error code
-    code: String,
+    code: EcoString,
 }
 
 impl CodedError {
     /// Create a new custom error with message and code
-    pub fn new<S1: Into<String>, S2: Into<String>>(message: S1, code: S2) -> Self {
+    pub fn new<S1: Into<EcoString>, S2: Into<EcoString>>(message: S1, code: S2) -> Self {
         Self {
             message: message.into(),
             code: code.into(),

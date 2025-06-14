@@ -16,12 +16,12 @@ fn test_derived_html_options() {
 
     // 创建一个包含 HTML 元素的节点
     let html_element = HtmlElement {
-        tag: "div".to_string(),
+        tag: "div".into(),
         attributes: vec![HtmlAttribute {
-            name: "class".to_string(),
-            value: "container".to_string(),
+            name: "class".into(),
+            value: "container".into(),
         }],
-        children: vec![Node::Text("Content in HTML element".to_string())],
+        children: vec![Node::Text("Content in HTML element".into())],
         self_closing: false,
     };
 
@@ -50,9 +50,9 @@ fn test_html_options_strict_mode() {
 
     // 创建一个包含无效标签名的 HTML 元素
     let invalid_tag_element = HtmlElement {
-        tag: "invalid<tag>".to_string(),
+        tag: "invalid<tag>".into(),
         attributes: vec![],
-        children: vec![Node::Text("Content".to_string())],
+        children: vec![Node::Text("Content".into())],
         self_closing: false,
     };
 
@@ -75,7 +75,7 @@ fn test_html_options_strict_mode() {
 fn test_code_block_language_class() {
     // 测试代码块语言类前缀选项
     let options_with_prefix = HtmlWriterOptions {
-        code_block_language_class_prefix: Some("lang-".to_string()),
+        code_block_language_class_prefix: Some("lang-".into()),
         ..Default::default()
     };
 
@@ -86,8 +86,8 @@ fn test_code_block_language_class() {
 
     // 创建代码块节点
     let code_block = Node::CodeBlock {
-        language: Some("rust".to_string()),
-        content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+        language: Some("rust".into()),
+        content: "fn main() {\n    println!(\"Hello\");\n}".into(),
         block_type: Default::default(),
     };
 
@@ -114,15 +114,15 @@ fn test_gfm_html_filtering() {
     // 测试 GFM HTML 过滤功能
     let options = HtmlWriterOptions {
         enable_gfm: true,
-        gfm_disallowed_html_tags: vec!["script".to_string()],
+        gfm_disallowed_html_tags: vec!["script".into()],
         ..Default::default()
     };
 
     // 创建一个 script 标签
     let script_element = HtmlElement {
-        tag: "script".to_string(),
+        tag: "script".into(),
         attributes: vec![],
-        children: vec![Node::Text("alert('test');".to_string())],
+        children: vec![Node::Text("alert('test');".into())],
         self_closing: false,
     };
 
@@ -145,19 +145,19 @@ fn test_nested_html_structures() {
 
     // 创建嵌套结构
     let nested_element = HtmlElement {
-        tag: "div".to_string(),
+        tag: "div".into(),
         attributes: vec![HtmlAttribute {
-            name: "class".to_string(),
-            value: "outer".to_string(),
+            name: "class".into(),
+            value: "outer".into(),
         }],
         children: vec![Node::HtmlElement(HtmlElement {
-            tag: "div".to_string(),
+            tag: "div".into(),
             attributes: vec![HtmlAttribute {
-                name: "class".to_string(),
-                value: "inner".to_string(),
+                name: "class".into(),
+                value: "inner".into(),
             }],
             children: vec![Node::Paragraph(vec![Node::Text(
-                "Paragraph inside HTML".to_string(),
+                "Paragraph inside HTML".into(),
             )])],
             self_closing: false,
         })],

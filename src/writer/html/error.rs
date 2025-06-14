@@ -62,14 +62,14 @@ impl HtmlWriteError {
         match self {
             HtmlWriteError::Io(err) => WriteError::IoError(err),
             HtmlWriteError::UnsupportedNodeType(msg) => WriteError::Custom {
-                message: format!("HTML writer error: {}", msg),
+                message: format!("HTML writer error: {}", msg).into(),
                 code: None,
             },
-            HtmlWriteError::InvalidStructure(msg) => WriteError::InvalidStructure(msg),
-            HtmlWriteError::InvalidHtmlTag(tag) => WriteError::InvalidHtmlTag(tag),
-            HtmlWriteError::InvalidHtmlAttribute(attr) => WriteError::InvalidHtmlAttribute(attr),
+            HtmlWriteError::InvalidStructure(msg) => WriteError::InvalidStructure(msg.into()),
+            HtmlWriteError::InvalidHtmlTag(tag) => WriteError::InvalidHtmlTag(tag.into()),
+            HtmlWriteError::InvalidHtmlAttribute(attr) => WriteError::InvalidHtmlAttribute(attr.into()),
             HtmlWriteError::CustomNodeError(msg) => WriteError::Custom {
-                message: format!("Custom node error: {}", msg),
+                message: format!("Custom node error: {}", msg).into(),
                 code: None,
             },
         }

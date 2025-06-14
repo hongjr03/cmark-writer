@@ -68,13 +68,14 @@ impl Parse for CustomNodeArgs {
 ///
 /// ```rust
 /// use cmark_writer_macros::custom_node;
+/// use ecow::EcoString;
 ///
 /// // Specified as an inline element with both CommonMark and HTML implementations
 /// #[derive(Debug, Clone, PartialEq)]
 /// #[custom_node(block=false, html_impl=true)]
 /// struct HighlightNode {
-///     content: String,
-///     color: String,
+///     content: EcoString,
+///     color: EcoString,
 /// }
 ///
 /// impl HighlightNode {
@@ -103,7 +104,7 @@ impl Parse for CustomNodeArgs {
 /// #[derive(Debug, Clone, PartialEq)]
 /// #[custom_node(block=true)]
 /// struct AlertNode {
-///     content: String,
+///     content: EcoString,
 /// }
 ///
 /// impl AlertNode {

@@ -6,7 +6,7 @@ fn test_setext_heading() {
     // 创建一级 Setext 标题节点
     let heading_level1 = Node::Heading {
         level: 1,
-        content: vec![Node::Text("这是一级 Setext 标题".to_string())],
+        content: vec![Node::Text("这是一级 Setext 标题".into())],
         heading_type: HeadingType::Setext,
     };
 
@@ -20,7 +20,7 @@ fn test_setext_heading() {
     // 创建二级 Setext 标题节点
     let heading_level2 = Node::Heading {
         level: 2,
-        content: vec![Node::Text("这是二级 Setext 标题".to_string())],
+        content: vec![Node::Text("这是二级 Setext 标题".into())],
         heading_type: HeadingType::Setext,
     };
 
@@ -38,11 +38,11 @@ fn test_complex_setext_heading() {
     let complex_heading = Node::Heading {
         level: 1,
         content: vec![
-            Node::Text("带有 ".to_string()),
-            Node::Emphasis(vec![Node::Text("强调".to_string())]),
-            Node::Text(" 和 ".to_string()),
-            Node::Strong(vec![Node::Text("加粗".to_string())]),
-            Node::Text(" 的 Setext 标题".to_string()),
+            Node::Text("带有 ".into()),
+            Node::Emphasis(vec![Node::Text("强调".into())]),
+            Node::Text(" 和 ".into()),
+            Node::Strong(vec![Node::Text("加粗".into())]),
+            Node::Text(" 的 Setext 标题".into()),
         ],
         heading_type: HeadingType::Setext,
     };
@@ -59,7 +59,7 @@ fn test_compare_atx_and_setext() {
     // ATX 标题
     let atx_heading = Node::Heading {
         level: 1,
-        content: vec![Node::Text("ATX 形式的标题".to_string())],
+        content: vec![Node::Text("ATX 形式的标题".into())],
         heading_type: HeadingType::Atx,
     };
 
@@ -70,7 +70,7 @@ fn test_compare_atx_and_setext() {
     // Setext 标题
     let setext_heading = Node::Heading {
         level: 1,
-        content: vec![Node::Text("Setext 形式的标题".to_string())],
+        content: vec![Node::Text("Setext 形式的标题".into())],
         heading_type: HeadingType::Setext,
     };
 
@@ -89,25 +89,25 @@ fn test_setext_heading_in_document() {
     let document = Node::Document(vec![
         Node::Heading {
             level: 1,
-            content: vec![Node::Text("文档标题 (ATX)".to_string())],
+            content: vec![Node::Text("文档标题 (ATX)".into())],
             heading_type: HeadingType::Atx,
         },
-        Node::Paragraph(vec![Node::Text("这是一段介绍性文字。".to_string())]),
+        Node::Paragraph(vec![Node::Text("这是一段介绍性文字。".into())]),
         Node::Heading {
             level: 2,
-            content: vec![Node::Text("第一部分 (Setext)".to_string())],
+            content: vec![Node::Text("第一部分 (Setext)".into())],
             heading_type: HeadingType::Setext,
         },
         Node::Paragraph(vec![Node::Text(
-            "这部分内容使用 Setext 风格的标题。".to_string(),
+            "这部分内容使用 Setext 风格的标题。".into(),
         )]),
         Node::Heading {
             level: 2,
-            content: vec![Node::Text("第二部分 (ATX)".to_string())],
+            content: vec![Node::Text("第二部分 (ATX)".into())],
             heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![Node::Text(
-            "这部分内容使用 ATX 风格的标题。".to_string(),
+            "这部分内容使用 ATX 风格的标题。".into(),
         )]),
     ]);
 

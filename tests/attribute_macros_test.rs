@@ -6,6 +6,7 @@ use cmark_writer::structure_error;
 use cmark_writer::CommonMarkWriter;
 use cmark_writer::Node;
 use cmark_writer::WriteResult;
+use ecow::EcoString;
 
 // 使用属性宏定义自定义错误
 #[structure_error(format = "表格行列不匹配：{}")]
@@ -21,8 +22,8 @@ struct TableAlignmentError(pub String, pub String);
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node]
 struct HighlightNode {
-    content: String,
-    color: String,
+    content: EcoString,
+    color: EcoString,
 }
 
 // 实现 HighlightNode 所需的方法
@@ -46,9 +47,9 @@ impl HighlightNode {
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node]
 struct CalloutNode {
-    title: String,
-    content: String,
-    style: String, // 例如：note, warning, danger
+    title: EcoString,
+    content: EcoString,
+    style: EcoString, // 例如：note, warning, danger
 }
 
 // 实现 CalloutNode 所需的方法
@@ -79,8 +80,8 @@ impl CalloutNode {
 fn test_highlight_node_attribute() {
     let mut writer = CommonMarkWriter::new();
     let highlight = Node::Custom(Box::new(HighlightNode {
-        content: "Highlighted text".to_string(),
-        color: "yellow".to_string(),
+        content: "Highlighted text".into(),
+        color: "yellow".into(),
     }));
 
     writer.write(&highlight).unwrap();
@@ -94,9 +95,9 @@ fn test_highlight_node_attribute() {
 fn test_callout_block_attribute() {
     let mut writer = CommonMarkWriter::new();
     let callout = Node::Custom(Box::new(CalloutNode {
-        title: "Important note".to_string(),
-        content: "This is an important message.".to_string(),
-        style: "warning".to_string(),
+        title: "Important note".into(),
+        content: "This is an important message.".into(),
+        style: "warning".into(),
     }));
 
     writer.write(&callout).unwrap();
@@ -138,23 +139,23 @@ fn test_multiple_custom_nodes_in_document() {
     let document = Node::Document(vec![
         Node::Heading {
             level: 1,
-            content: vec![Node::Text("使用属性宏的示例文档".to_string())],
+            content: vec![Node::Text("使用属性宏的示例文档".into())],
             heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![
-            Node::Text("这是一个包含".to_string()),
+            Node::Text("这是一个包含".into()),
             Node::Custom(Box::new(HighlightNode {
-                content: "高亮文本".to_string(),
-                color: "yellow".to_string(),
+                content: "高亮文本".into(),
+                color: "yellow".into(),
             })),
-            Node::Text("的段落。".to_string()),
+            Node::Text("的段落。".into()),
         ]),
         Node::Custom(Box::new(CalloutNode {
-            title: "重要提示".to_string(),
-            content: "使用属性宏可以简化代码并提高可读性。".to_string(),
-            style: "info".to_string(),
+            title: "重要提示".into(),
+            content: "使用属性宏可以简化代码并提高可读性。".into(),
+            style: "info".into(),
         })),
-        Node::Paragraph(vec![Node::Text("文档结束。".to_string())]),
+        Node::Paragraph(vec![Node::Text("文档结束。".into())]),
     ]);
 
     writer.write(&document).unwrap();

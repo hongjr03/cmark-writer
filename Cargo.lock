@@ -90,8 +90,7 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "ecow"
 version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b92b481eb5d59fd8e80e92ff11d057d1ca8d144b2cd8c66cc8d5bd177a3c0dc5"
+source = "git+https://github.com/typst/ecow.git#4060f824654ed5af023087296d28e11eca46f66b"
 
 [[package]]
 name = "env_filter"

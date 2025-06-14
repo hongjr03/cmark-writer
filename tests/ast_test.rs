@@ -17,9 +17,9 @@ use cmark_writer::ast::{HeadingType, ListItem, Node};
 #[test]
 fn test_node_equality() {
     // Test inline node equality
-    let text1 = Node::Text("Hello".to_string());
-    let text2 = Node::Text("Hello".to_string());
-    let text3 = Node::Text("World".to_string());
+    let text1 = Node::Text("Hello".into());
+    let text2 = Node::Text("Hello".into());
+    let text3 = Node::Text("World".into());
 
     assert_eq!(text1, text2);
     assert_ne!(text1, text3);
@@ -27,19 +27,19 @@ fn test_node_equality() {
     // Test complex node equality
     let heading1 = Node::Heading {
         level: 2,
-        content: vec![Node::Text("Title".to_string())],
+        content: vec![Node::Text("Title".into())],
         heading_type: HeadingType::Atx,
     };
 
     let heading2 = Node::Heading {
         level: 2,
-        content: vec![Node::Text("Title".to_string())],
+        content: vec![Node::Text("Title".into())],
         heading_type: HeadingType::Atx,
     };
 
     let heading3 = Node::Heading {
         level: 3, // Different level
-        content: vec![Node::Text("Title".to_string())],
+        content: vec![Node::Text("Title".into())],
         heading_type: HeadingType::Atx,
     };
 
@@ -53,15 +53,15 @@ fn test_document_creation() {
     let document = Node::Document(vec![
         Node::Heading {
             level: 1,
-            content: vec![Node::Text("Document Title".to_string())],
+            content: vec![Node::Text("Document Title".into())],
             heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![
-            Node::Text("Paragraph with ".to_string()),
-            Node::Emphasis(vec![Node::Text("emphasis".to_string())]),
-            Node::Text(" and ".to_string()),
-            Node::Strong(vec![Node::Text("strong".to_string())]),
-            Node::Text(" text.".to_string()),
+            Node::Text("Paragraph with ".into()),
+            Node::Emphasis(vec![Node::Text("emphasis".into())]),
+            Node::Text(" and ".into()),
+            Node::Strong(vec![Node::Text("strong".into())]),
+            Node::Text(" text.".into()),
         ]),
     ]);
 
@@ -78,7 +78,7 @@ fn test_document_creation() {
         {
             assert_eq!(*level, 1);
             assert_eq!(content.len(), 1);
-            assert_eq!(content[0], Node::Text("Document Title".to_string()));
+            assert_eq!(content[0], Node::Text("Document Title".into()));
         } else {
             panic!("First child should be a heading");
         }
@@ -86,16 +86,16 @@ fn test_document_creation() {
         // Verify paragraph
         if let Node::Paragraph(content) = &children[1] {
             assert_eq!(content.len(), 5);
-            assert_eq!(content[0], Node::Text("Paragraph with ".to_string()));
+            assert_eq!(content[0], Node::Text("Paragraph with ".into()));
 
             if let Node::Emphasis(emph_content) = &content[1] {
-                assert_eq!(emph_content[0], Node::Text("emphasis".to_string()));
+                assert_eq!(emph_content[0], Node::Text("emphasis".into()));
             } else {
                 panic!("Second element should be emphasis");
             }
 
             if let Node::Strong(strong_content) = &content[3] {
-                assert_eq!(strong_content[0], Node::Text("strong".to_string()));
+                assert_eq!(strong_content[0], Node::Text("strong".into()));
             } else {
                 panic!("Fourth element should be strong");
             }
@@ -110,15 +110,13 @@ fn test_document_creation() {
 #[test]
 fn test_list_item() {
     let unordered_item = ListItem::Unordered {
-        content: vec![Node::Paragraph(vec![Node::Text(
-            "Unordered item".to_string(),
-        )])],
+        content: vec![Node::Paragraph(vec![Node::Text("Unordered item".into())])],
     };
 
     if let ListItem::Unordered { content } = &unordered_item {
         assert_eq!(content.len(), 1);
         if let Node::Paragraph(text) = &content[0] {
-            assert_eq!(text[0], Node::Text("Unordered item".to_string()));
+            assert_eq!(text[0], Node::Text("Unordered item".into()));
         } else {
             panic!("Content should be a paragraph");
         }
@@ -128,16 +126,14 @@ fn test_list_item() {
 
     let ordered_item = ListItem::Ordered {
         number: Some(3),
-        content: vec![Node::Paragraph(vec![Node::Text(
-            "Ordered item".to_string(),
-        )])],
+        content: vec![Node::Paragraph(vec![Node::Text("Ordered item".into())])],
     };
 
     if let ListItem::Ordered { number, content } = &ordered_item {
         assert_eq!(*number, Some(3));
         assert_eq!(content.len(), 1);
         if let Node::Paragraph(text) = &content[0] {
-            assert_eq!(text[0], Node::Text("Ordered item".to_string()));
+            assert_eq!(text[0], Node::Text("Ordered item".into()));
         } else {
             panic!("Content should be a paragraph");
         }
@@ -151,21 +147,21 @@ fn test_node_type_checking() {
     // Test block node type checking
     let heading = Node::Heading {
         level: 1,
-        content: vec![Node::Text("Heading".to_string())],
+        content: vec![Node::Text("Heading".into())],
         heading_type: HeadingType::Atx,
     };
     assert!(heading.is_block());
     assert!(!heading.is_inline());
 
     // Test inline node type checking
-    let text = Node::Text("Hello".to_string());
+    let text = Node::Text("Hello".into());
     assert!(text.is_inline());
     assert!(!text.is_block());
 
     // Test nested nodes
     let paragraph = Node::Paragraph(vec![
-        Node::Text("Text with ".to_string()),
-        Node::Emphasis(vec![Node::Text("emphasis".to_string())]),
+        Node::Text("Text with ".into()),
+        Node::Emphasis(vec![Node::Text("emphasis".into())]),
     ]);
     assert!(paragraph.is_block());
     assert!(!paragraph.is_inline());
@@ -174,7 +170,7 @@ fn test_node_type_checking() {
 #[test]
 fn test_heading_constructor() {
     // 测试新添加的 heading 构造方法
-    let heading = Node::heading(2, vec![Node::Text("标题".to_string())]);
+    let heading = Node::heading(2, vec![Node::Text("标题".into())]);
 
     // 验证结构
     if let Node::Heading {
@@ -185,7 +181,7 @@ fn test_heading_constructor() {
     {
         assert_eq!(*level, 2);
         assert_eq!(content.len(), 1);
-        assert_eq!(content[0], Node::Text("标题".to_string()));
+        assert_eq!(content[0], Node::Text("标题".into()));
         assert_eq!(*heading_type, HeadingType::Atx); // 默认应该是 Atx 类型
     } else {
         panic!("应该是 Heading 节点");
@@ -194,7 +190,7 @@ fn test_heading_constructor() {
     // 验证与手动构造的等价性
     let manual_heading = Node::Heading {
         level: 2,
-        content: vec![Node::Text("标题".to_string())],
+        content: vec![Node::Text("标题".into())],
         heading_type: HeadingType::default(),
     };
 
@@ -204,7 +200,7 @@ fn test_heading_constructor() {
 #[test]
 fn test_code_block_constructor() {
     // 测试带语言标识的代码块
-    let rust_code = Node::code_block(Some("rust".to_string()), "fn main() {}\n".to_string());
+    let rust_code = Node::code_block(Some("rust".into()), "fn main() {}\n".into());
 
     if let Node::CodeBlock {
         language,
@@ -212,7 +208,7 @@ fn test_code_block_constructor() {
         block_type,
     } = &rust_code
     {
-        assert_eq!(*language, Some("rust".to_string()));
+        assert_eq!(*language, Some("rust".into()));
         assert_eq!(*content, "fn main() {}\n".to_string());
         assert!(matches!(
             *block_type,
@@ -223,7 +219,7 @@ fn test_code_block_constructor() {
     }
 
     // 测试不带语言标识的代码块
-    let plain_code = Node::code_block(None, "plain text".to_string());
+    let plain_code = Node::code_block(None, "plain text".into());
 
     if let Node::CodeBlock {
         language,

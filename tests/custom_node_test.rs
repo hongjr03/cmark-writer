@@ -9,6 +9,7 @@ use cmark_writer::CommonMarkWriter;
 use cmark_writer::HeadingType;
 use cmark_writer::Node;
 use cmark_writer::WriteResult;
+use ecow::EcoString;
 
 // 使用属性宏定义自定义错误
 #[structure_error(format = "表格行列不匹配：{}")]
@@ -24,8 +25,8 @@ struct TableAlignmentError(pub String, pub String);
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node(block = false)]
 struct HighlightNode {
-    content: String,
-    color: String,
+    content: EcoString,
+    color: EcoString,
 }
 
 // Implementing required methods for HighlightNode
@@ -60,9 +61,9 @@ impl HighlightNode {
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node(block = true)]
 struct CalloutNode {
-    title: String,
-    content: String,
-    style: String, // e.g.: note, warning, danger
+    title: EcoString,
+    content: EcoString,
+    style: EcoString, // e.g.: note, warning, danger
 }
 
 // Implementing required methods for CalloutNode
@@ -114,8 +115,8 @@ impl CalloutNode {
 fn test_highlight_node() {
     let mut writer = CommonMarkWriter::new();
     let highlight = Node::Custom(Box::new(HighlightNode {
-        content: "Highlighted text".to_string(),
-        color: "yellow".to_string(),
+        content: "Highlighted text".into(),
+        color: "yellow".into(),
     }));
 
     writer.write(&highlight).unwrap();
@@ -129,9 +130,9 @@ fn test_highlight_node() {
 fn test_callout_block() {
     let mut writer = CommonMarkWriter::new();
     let callout = Node::Custom(Box::new(CalloutNode {
-        title: "Important note".to_string(),
-        content: "This is an important message.".to_string(),
-        style: "warning".to_string(),
+        title: "Important note".into(),
+        content: "This is an important message.".into(),
+        style: "warning".into(),
     }));
 
     writer.write(&callout).unwrap();
@@ -143,12 +144,12 @@ fn test_callout_block() {
 fn test_custom_node_in_paragraph() {
     let mut writer = CommonMarkWriter::new();
     let paragraph = Node::Paragraph(vec![
-        Node::Text("This is regular text with ".to_string()),
+        Node::Text("This is regular text with ".into()),
         Node::Custom(Box::new(HighlightNode {
-            content: "highlighted text".to_string(),
-            color: "yellow".to_string(),
+            content: "highlighted text".into(),
+            color: "yellow".into(),
         })),
-        Node::Text(" mixed together.".to_string()),
+        Node::Text(" mixed together.".into()),
     ]);
 
     writer.write(&paragraph).unwrap();
@@ -164,16 +165,16 @@ fn test_custom_block_in_document() {
     let document = Node::Document(vec![
         Node::Heading {
             level: 1,
-            content: vec![Node::Text("Document Title".to_string())],
+            content: vec![Node::Text("Document Title".into())],
             heading_type: HeadingType::Atx,
         },
-        Node::Paragraph(vec![Node::Text("This is a paragraph.".to_string())]),
+        Node::Paragraph(vec![Node::Text("This is a paragraph.".into())]),
         Node::Custom(Box::new(CalloutNode {
-            title: "Important Information".to_string(),
-            content: "Please pay attention to this content.".to_string(),
-            style: "info".to_string(),
+            title: "Important Information".into(),
+            content: "Please pay attention to this content.".into(),
+            style: "info".into(),
         })),
-        Node::Paragraph(vec![Node::Text("Another paragraph.".to_string())]),
+        Node::Paragraph(vec![Node::Text("Another paragraph.".into())]),
     ]);
 
     writer.write(&document).unwrap();
@@ -190,9 +191,9 @@ struct FigureNode {
     /// The main content of the figure, can be any block node
     body: Box<Node>,
     /// The caption text for the figure
-    caption: String,
+    caption: EcoString,
     /// Optional ID for referencing
-    id: Option<String>,
+    id: Option<EcoString>,
 }
 
 impl FigureNode {
@@ -263,12 +264,12 @@ fn test_figure_with_image() {
     // Create a figure containing an image
     let figure = Node::Custom(Box::new(FigureNode {
         body: Box::new(Node::Paragraph(vec![Node::Image {
-            url: "sample.jpg".to_string(),
-            title: Some("Sample image".to_string()),
-            alt: vec![Node::Text("A sample image".to_string())],
+            url: "sample.jpg".into(),
+            title: Some("Sample image".into()),
+            alt: vec![Node::Text("A sample image".into())],
         }])),
-        caption: "Figure 1: Sample illustration".to_string(),
-        id: Some("fig1".to_string()),
+        caption: "Figure 1: Sample illustration".into(),
+        id: Some("fig1".into()),
     }));
 
     writer.write(&figure).unwrap();
@@ -284,11 +285,11 @@ fn test_figure_with_code_block() {
     // Create a figure containing a code block
     let figure = Node::Custom(Box::new(FigureNode {
         body: Box::new(Node::CodeBlock {
-            language: Some("rust".to_string()),
-            content: "fn main() {\n    println!(\"Hello, world!\");\n}".to_string(),
+            language: Some("rust".into()),
+            content: "fn main() {\n    println!(\"Hello, world!\");\n}".into(),
             block_type: CodeBlockType::Fenced,
         }),
-        caption: "Figure 2: Rust Hello World example".to_string(),
+        caption: "Figure 2: Rust Hello World example".into(),
         id: None,
     }));
 
@@ -307,25 +308,16 @@ fn test_figure_with_table() {
 
     let figure = Node::Custom(Box::new(FigureNode {
         body: Box::new(Node::Table {
-            headers: vec![
-                Node::Text("Name".to_string()),
-                Node::Text("Value".to_string()),
-            ],
+            headers: vec![Node::Text("Name".into()), Node::Text("Value".into())],
             rows: vec![
-                vec![
-                    Node::Text("Item 1".to_string()),
-                    Node::Text("100".to_string()),
-                ],
-                vec![
-                    Node::Text("Item 2".to_string()),
-                    Node::Text("200".to_string()),
-                ],
+                vec![Node::Text("Item 1".into()), Node::Text("100".into())],
+                vec![Node::Text("Item 2".into()), Node::Text("200".into())],
             ],
             #[cfg(feature = "gfm")]
             alignments: vec![TableAlignment::Left, TableAlignment::Right],
         }),
-        caption: "Figure 3: Sample data table".to_string(),
-        id: Some("data-table".to_string()),
+        caption: "Figure 3: Sample data table".into(),
+        id: Some("data-table".into()),
     }));
 
     writer.write(&figure).unwrap();
@@ -342,25 +334,25 @@ fn test_figure_in_document() {
     let document = Node::Document(vec![
         Node::Heading {
             level: 1,
-            content: vec![Node::Text("Document with Figures".to_string())],
+            content: vec![Node::Text("Document with Figures".into())],
             heading_type: HeadingType::Atx,
         },
         Node::Paragraph(vec![Node::Text(
-            "This document demonstrates using figures.".to_string(),
+            "This document demonstrates using figures.".into(),
         )]),
         Node::Custom(Box::new(FigureNode {
             body: Box::new(Node::BlockQuote(vec![Node::Paragraph(vec![Node::Text(
-                "This is a quote inside a figure.".to_string(),
+                "This is a quote inside a figure.".into(),
             )])])),
-            caption: "Figure 1: An important quote".to_string(),
-            id: Some("quote-fig".to_string()),
+            caption: "Figure 1: An important quote".into(),
+            id: Some("quote-fig".into()),
         })),
-        Node::Paragraph(vec![Node::Text("Text after the figure.".to_string())]),
+        Node::Paragraph(vec![Node::Text("Text after the figure.".into())]),
     ]);
 
     writer.write(&document).unwrap();
 
-    let expected = String::from("# Document with Figures\n\n")
+    let expected = EcoString::from("# Document with Figures\n\n")
         + "This document demonstrates using figures.\n\n"
         + "<figure id=\"quote-fig\">\n"
         + "> This is a quote inside a figure.\n\n"
@@ -377,8 +369,8 @@ fn test_custom_node_attribute() {
     #[derive(Debug, Clone, PartialEq)]
     #[custom_node]
     struct AlertBox {
-        message: String,
-        level: String, // info, warning, error
+        message: EcoString,
+        level: EcoString, // info, warning, error
     }
 
     // Implement the required methods for AlertBox
@@ -401,8 +393,8 @@ fn test_custom_node_attribute() {
 
     // Create an instance of our custom node
     let alert = Node::Custom(Box::new(AlertBox {
-        message: "This is an important alert message.".to_string(),
-        level: "warning".to_string(),
+        message: "This is an important alert message.".into(),
+        level: "warning".into(),
     }));
 
     // Test rendering the custom node
@@ -417,15 +409,15 @@ fn test_custom_node_attribute() {
     let document = Node::Document(vec![
         Node::Heading {
             level: 1,
-            content: vec![Node::Text("Document with Alert".to_string())],
+            content: vec![Node::Text("Document with Alert".into())],
             heading_type: HeadingType::Atx,
         },
-        Node::Paragraph(vec![Node::Text("Text before alert.".to_string())]),
+        Node::Paragraph(vec![Node::Text("Text before alert.".into())]),
         Node::Custom(Box::new(AlertBox {
-            message: "This is an important alert message.".to_string(),
-            level: "warning".to_string(),
+            message: "This is an important alert message.".into(),
+            level: "warning".into(),
         })),
-        Node::Paragraph(vec![Node::Text("Text after alert.".to_string())]),
+        Node::Paragraph(vec![Node::Text("Text after alert.".into())]),
     ]);
 
     let mut writer = CommonMarkWriter::new();
@@ -530,29 +522,29 @@ fn test_aligned_table() {
 
     let table = Node::Custom(Box::new(AlignedTableNode {
         headers: vec![
-            Node::Text("名称".to_string()),
-            Node::Text("描述".to_string()),
-            Node::Text("数量".to_string()),
-            Node::Text("价格".to_string()),
+            Node::Text("名称".into()),
+            Node::Text("描述".into()),
+            Node::Text("数量".into()),
+            Node::Text("价格".into()),
         ],
         rows: vec![
             vec![
-                Node::Text("商品 A".to_string()),
-                Node::Text("高质量产品".to_string()),
-                Node::Text("10".to_string()),
-                Node::Text("$100.00".to_string()),
+                Node::Text("商品 A".into()),
+                Node::Text("高质量产品".into()),
+                Node::Text("10".into()),
+                Node::Text("$100.00".into()),
             ],
             vec![
-                Node::Text("商品 B".to_string()),
-                Node::Text("性价比之选".to_string()),
-                Node::Text("20".to_string()),
-                Node::Text("$50.00".to_string()),
+                Node::Text("商品 B".into()),
+                Node::Text("性价比之选".into()),
+                Node::Text("20".into()),
+                Node::Text("$50.00".into()),
             ],
             vec![
-                Node::Text("商品 C".to_string()),
-                Node::Text("入门级产品".to_string()),
-                Node::Text("30".to_string()),
-                Node::Text("$25.00".to_string()),
+                Node::Text("商品 C".into()),
+                Node::Text("入门级产品".into()),
+                Node::Text("30".into()),
+                Node::Text("$25.00".into()),
             ],
         ],
         alignments: vec![
@@ -576,23 +568,23 @@ fn test_aligned_table_in_figure() {
     let figure = Node::Custom(Box::new(FigureNode {
         body: Box::new(Node::Custom(Box::new(AlignedTableNode {
             headers: vec![
-                Node::Text("产品".to_string()),
-                Node::Text("Q1".to_string()),
-                Node::Text("Q2".to_string()),
-                Node::Text("同比增长".to_string()),
+                Node::Text("产品".into()),
+                Node::Text("Q1".into()),
+                Node::Text("Q2".into()),
+                Node::Text("同比增长".into()),
             ],
             rows: vec![
                 vec![
-                    Node::Text("手机".to_string()),
-                    Node::Text("1200".to_string()),
-                    Node::Text("1500".to_string()),
-                    Node::Text("25%".to_string()),
+                    Node::Text("手机".into()),
+                    Node::Text("1200".into()),
+                    Node::Text("1500".into()),
+                    Node::Text("25%".into()),
                 ],
                 vec![
-                    Node::Text("平板".to_string()),
-                    Node::Text("450".to_string()),
-                    Node::Text("480".to_string()),
-                    Node::Text("7%".to_string()),
+                    Node::Text("平板".into()),
+                    Node::Text("450".into()),
+                    Node::Text("480".into()),
+                    Node::Text("7%".into()),
                 ],
             ],
             alignments: vec![
@@ -602,8 +594,8 @@ fn test_aligned_table_in_figure() {
                 Alignment::Center,
             ],
         }))),
-        caption: "图表 1:2025 年上半年销售数据".to_string(),
-        id: Some("sales-data".to_string()),
+        caption: "图表 1:2025 年上半年销售数据".into(),
+        id: Some("sales-data".into()),
     }));
 
     writer.write(&figure).unwrap();

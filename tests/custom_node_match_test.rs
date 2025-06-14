@@ -2,13 +2,14 @@
 mod tests {
     use cmark_writer::{ast::Node, error::WriteResult, CommonMarkWriter};
     use cmark_writer_macros::custom_node;
+    use ecow::EcoString;
 
     // 使用 block=false 指定为行内元素
     #[derive(Debug, Clone, PartialEq)]
     #[custom_node(block = false)]
     struct ColoredTextNode {
-        content: String,
-        color: String,
+        content: EcoString,
+        color: EcoString,
     }
 
     impl ColoredTextNode {
@@ -26,7 +27,7 @@ mod tests {
     #[derive(Debug, Clone, PartialEq)]
     #[custom_node(block = true)]
     struct AlertBoxNode {
-        content: String,
+        content: EcoString,
         level: AlertLevel,
     }
 
@@ -56,17 +57,17 @@ mod tests {
     }
 
     // 创建一个处理节点的函数
-    fn process_node(node: &Node) -> String {
+    fn process_node(node: &Node) -> EcoString {
         match node {
             Node::Document(children) => {
-                let mut result = String::new();
+                let mut result = EcoString::new();
                 for child in children {
                     result.push_str(&process_node(child));
                 }
                 result
             }
             Node::Paragraph(children) => {
-                let mut result = String::from("<p>");
+                let mut result = EcoString::from("<p>");
                 for child in children {
                     result.push_str(&process_node(child));
                 }
@@ -80,6 +81,7 @@ mod tests {
                     "<span style=\"color: {}\">{}</span>",
                     colored.color, colored.content
                 )
+                .into()
             }
             node if node.is_custom_type::<AlertBoxNode>() => {
                 let alert = node.as_custom_type::<AlertBoxNode>().unwrap();
@@ -92,23 +94,24 @@ mod tests {
                     "<div class=\"alert alert-{}\">{}</div>",
                     class, alert.content
                 )
+                .into()
             }
-            _ => String::from("[未处理的节点]"),
+            _ => EcoString::from("[未处理的节点]"),
         }
     }
 
     // 另一种匹配方式，使用自定义节点类型的 matches 方法
-    fn process_node_alt(node: &Node) -> String {
+    fn process_node_alt(node: &Node) -> EcoString {
         match node {
             Node::Document(children) => {
-                let mut result = String::new();
+                let mut result = EcoString::new();
                 for child in children {
                     result.push_str(&process_node_alt(child));
                 }
                 result
             }
             Node::Paragraph(children) => {
-                let mut result = String::from("<p>");
+                let mut result = EcoString::from("<p>");
                 for child in children {
                     result.push_str(&process_node_alt(child));
                 }
@@ -123,8 +126,9 @@ mod tests {
                             "<span style=\"color: {}\">{}</span>",
                             colored.color, colored.content
                         )
+                        .into()
                     } else {
-                        String::from("[类型转换失败]")
+                        EcoString::from("[类型转换失败]")
                     }
                 } else if AlertBoxNode::matches(&**custom) {
                     if let Some(alert) = custom.as_any().downcast_ref::<AlertBoxNode>() {
@@ -137,14 +141,15 @@ mod tests {
                             "<div class=\"alert alert-{}\">{}</div>",
                             class, alert.content
                         )
+                        .into()
                     } else {
-                        String::from("[类型转换失败]")
+                        EcoString::from("[类型转换失败]")
                     }
                 } else {
-                    String::from("[未知的自定义节点]")
+                    EcoString::from("[未知的自定义节点]")
                 }
             }
-            _ => String::from("[未处理的节点]"),
+            _ => EcoString::from("[未处理的节点]"),
         }
     }
 
@@ -154,16 +159,16 @@ mod tests {
         let nodes = vec![
             // 添加一个普通段落
             Node::Paragraph(vec![
-                Node::Text("这是普通文本，".to_string()),
+                Node::Text("这是普通文本，".into()),
                 Node::Custom(Box::new(ColoredTextNode {
-                    content: "这是彩色文本".to_string(),
-                    color: "red".to_string(),
+                    content: "这是彩色文本".into(),
+                    color: "red".into(),
                 })),
-                Node::Text("。".to_string()),
+                Node::Text("。".into()),
             ]),
             // 添加一个警告框
             Node::Custom(Box::new(AlertBoxNode {
-                content: "这是一个警告信息！".to_string(),
+                content: "这是一个警告信息！".into(),
                 level: AlertLevel::Warning,
             })),
         ];

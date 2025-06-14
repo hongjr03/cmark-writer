@@ -16,11 +16,11 @@ use cmark_writer::writer::CommonMarkWriter;
 
 // Create a document
 let document = Node::Document(vec![
-    Node::heading(1, vec![Node::Text("Hello CommonMark".to_string())]),
+    Node::heading(1, vec![Node::Text("Hello CommonMark".into())]),
     Node::Paragraph(vec![
-        Node::Text("This is a simple ".to_string()),
-        Node::Strong(vec![Node::Text("example".to_string())]),
-        Node::Text(".".to_string()),
+        Node::Text("This is a simple ".into()),
+        Node::Strong(vec![Node::Text("example".into())]),
+        Node::Text(".".into()),
     ]),
 ]);
 
@@ -56,16 +56,16 @@ use cmark_writer::ast::{Node, tables::TableBuilder};
 // Create tables with the builder pattern
 let table = TableBuilder::new()
     .headers(vec![
-        Node::Text("Name".to_string()), 
-        Node::Text("Age".to_string())
+        Node::Text("Name".into()), 
+        Node::Text("Age".into())
     ])
     .add_row(vec![
-        Node::Text("John".to_string()),
-        Node::Text("30".to_string()),
+        Node::Text("John".into()),
+        Node::Text("30".into()),
     ])
     .add_row(vec![
-        Node::Text("Alice".to_string()),
-        Node::Text("25".to_string()),
+        Node::Text("Alice".into()),
+        Node::Text("25".into()),
     ])
     .build();
 ```
@@ -97,17 +97,17 @@ use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node};
 // Create HTML writer with custom options
 let options = HtmlWriterOptions {
     strict: true,
-    code_block_language_class_prefix: Some("language-".to_string()),
+    code_block_language_class_prefix: Some("language-".into()),
     #[cfg(feature = "gfm")]
     enable_gfm: true,
     #[cfg(feature = "gfm")]
-    gfm_disallowed_html_tags: vec!["script".to_string()],
+    gfm_disallowed_html_tags: vec!["script".into()],
 };
 
 let mut writer = HtmlWriter::with_options(options);
 
 // Write some nodes
-let paragraph = Node::Paragraph(vec![Node::Text("Hello HTML".to_string())]);
+let paragraph = Node::Paragraph(vec![Node::Text("Hello HTML".into())]);
 writer.write_node(&paragraph).unwrap();
 
 // Get resulting HTML
@@ -121,12 +121,13 @@ assert_eq!(html, "<p>Hello HTML</p>\n");
 use cmark_writer::{CommonMarkWriter, HtmlWriter, HtmlWriteResult, Node};
 use cmark_writer::WriteResult;
 use cmark_writer::custom_node;
+use ecow::EcoString;
 
 #[derive(Debug, Clone, PartialEq)]
 #[custom_node(block=false, html_impl=true)]
 struct HighlightNode {
-    content: String,
-    color: String,
+    content: EcoString,
+    color: EcoString,
 }
 
 impl HighlightNode {

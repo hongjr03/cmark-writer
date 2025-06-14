@@ -15,7 +15,7 @@ fn test_invalid_heading_level() {
     // Test heading level 0 (invalid)
     let invalid_heading_0 = Node::Heading {
         level: 0,
-        content: vec![Node::Text("Invalid Heading".to_string())],
+        content: vec![Node::Text("Invalid Heading".into())],
         heading_type: HeadingType::Atx,
     };
     let result = writer.write(&invalid_heading_0);
@@ -31,7 +31,7 @@ fn test_invalid_heading_level() {
     let mut writer = CommonMarkWriter::new();
     let invalid_heading_7 = Node::Heading {
         level: 7,
-        content: vec![Node::Text("Invalid Heading".to_string())],
+        content: vec![Node::Text("Invalid Heading".into())],
         heading_type: HeadingType::Atx,
     };
     let result = writer.write(&invalid_heading_7);
@@ -47,7 +47,7 @@ fn test_invalid_heading_level() {
     let mut writer = CommonMarkWriter::new();
     let valid_heading = Node::Heading {
         level: 6,
-        content: vec![Node::Text("Valid Heading".to_string())],
+        content: vec![Node::Text("Valid Heading".into())],
         heading_type: HeadingType::Atx,
     };
     assert!(writer.write(&valid_heading).is_ok());
@@ -58,7 +58,7 @@ fn test_newline_in_inline_element() {
     let mut writer = CommonMarkWriter::new();
 
     // Test newline in text
-    let text_with_newline = Node::Text("Line 1\nLine 2".to_string());
+    let text_with_newline = Node::Text("Line 1\nLine 2".into());
     let result = writer.write(&text_with_newline);
     assert!(result.is_err());
 
@@ -71,19 +71,19 @@ fn test_newline_in_inline_element() {
 
     // Test newline in emphasis
     let mut writer = CommonMarkWriter::new();
-    let emphasis_with_newline = Node::Emphasis(vec![Node::Text("Line 1\nLine 2".to_string())]);
+    let emphasis_with_newline = Node::Emphasis(vec![Node::Text("Line 1\nLine 2".into())]);
     let result = writer.write(&emphasis_with_newline);
     assert!(result.is_err());
 
     // Test newline in strong
     let mut writer = CommonMarkWriter::new();
-    let strong_with_newline = Node::Strong(vec![Node::Text("Line 1\nLine 2".to_string())]);
+    let strong_with_newline = Node::Strong(vec![Node::Text("Line 1\nLine 2".into())]);
     let result = writer.write(&strong_with_newline);
     assert!(result.is_err());
 
     // Test newline in inline code
     let mut writer = CommonMarkWriter::new();
-    let code_with_newline = Node::InlineCode("Line 1\nLine 2".to_string());
+    let code_with_newline = Node::InlineCode("Line 1\nLine 2".into());
     let result = writer.write(&code_with_newline);
     assert!(result.is_err());
 }
@@ -129,8 +129,8 @@ fn test_error_display() {
     // Test that all error types can be displayed correctly
     let errors = vec![
         WriteError::InvalidHeadingLevel(0),
-        WriteError::NewlineInInlineElement("Text".to_string()),
-        WriteError::FmtError("test error".to_string()),
+        WriteError::NewlineInInlineElement("Text".into()),
+        WriteError::FmtError("test error".into()),
         WriteError::UnsupportedNodeType,
     ];
 
@@ -149,8 +149,8 @@ fn test_error_debug() {
     // Test that all error types can be debug formatted
     let errors = vec![
         WriteError::InvalidHeadingLevel(0),
-        WriteError::NewlineInInlineElement("Text".to_string()),
-        WriteError::FmtError("test error".to_string()),
+        WriteError::NewlineInInlineElement("Text".into()),
+        WriteError::FmtError("test error".into()),
         WriteError::UnsupportedNodeType,
     ];
 
@@ -185,7 +185,7 @@ fn test_custom_errors() {
         "Custom error [TABLE_STRUCTURE_ERROR]: 表格行单元格数与表头数不匹配"
     );
 
-    let structure_err = WriteError::InvalidStructure("表格结构无效".to_string());
+    let structure_err = WriteError::InvalidStructure("表格结构无效".into());
     assert_eq!(structure_err.to_string(), "Invalid structure: 表格结构无效");
 
     fn takes_error(_: &dyn Error) {}
@@ -222,11 +222,8 @@ fn test_custom_error_attribute() {
         "Invalid structure: 表格空表头：表格必须包含至少一个表头"
     );
 
-    let err3 = MarkdownSyntaxError(
-        "缺少闭合代码块标记".to_string(),
-        "CODE_BLOCK_UNCLOSED".to_string(),
-    )
-    .into_error();
+    let err3 =
+        MarkdownSyntaxError("缺少闭合代码块标记".into(), "CODE_BLOCK_UNCLOSED".into()).into_error();
     assert_eq!(
         err3.to_string(),
         "Custom error [CODE_BLOCK_UNCLOSED]: 缺少闭合代码块标记"
@@ -258,11 +255,7 @@ fn test_mixed_order_custom_errors() {
     #[structure_error(format = "渲染错误：{}")]
     struct RenderError(pub &'static str);
 
-    let err1 = ValidationError(
-        "数据验证失败".to_string(),
-        "DATA_VALIDATION_FAILED".to_string(),
-    )
-    .into_error();
+    let err1 = ValidationError("数据验证失败".into(), "DATA_VALIDATION_FAILED".into()).into_error();
     assert_eq!(
         err1.to_string(),
         "Custom error [DATA_VALIDATION_FAILED]: 数据验证失败"
@@ -274,7 +267,7 @@ fn test_mixed_order_custom_errors() {
         "Invalid structure: 解析错误：无法解析 Markdown"
     );
 
-    let err3 = FormatError("格式化失败".to_string(), "FORMAT_FAILED".to_string()).into_error();
+    let err3 = FormatError("格式化失败".into(), "FORMAT_FAILED".into()).into_error();
     assert_eq!(err3.to_string(), "Custom error [FORMAT_FAILED]: 格式化失败");
 
     let err4 = RenderError("无法渲染表格").into_error();
@@ -302,7 +295,7 @@ fn test_invalid_heading_level_strict() {
     let mut writer = CommonMarkWriter::with_options(options);
     let node = Node::Heading {
         level: 0, // Invalid level
-        content: vec![Node::Text("Test".to_string())],
+        content: vec![Node::Text("Test".into())],
         heading_type: HeadingType::Atx,
     };
     match writer.write(&node) {
@@ -321,7 +314,7 @@ fn test_invalid_heading_level_non_strict() {
     let mut writer = CommonMarkWriter::with_options(options);
     let node = Node::Heading {
         level: 0, // Invalid level
-        content: vec![Node::Text("Test".to_string())],
+        content: vec![Node::Text("Test".into())],
         heading_type: HeadingType::Atx,
     };
     assert!(writer.write(&node).is_ok());
@@ -340,7 +333,7 @@ fn test_invalid_heading_level_7_non_strict() {
     let mut writer = CommonMarkWriter::with_options(options);
     let node = Node::Heading {
         level: 7, // Invalid level
-        content: vec![Node::Text("Test".to_string())],
+        content: vec![Node::Text("Test".into())],
         heading_type: HeadingType::Atx,
     };
     assert!(writer.write(&node).is_ok());
@@ -358,9 +351,9 @@ fn test_newline_in_link_text_strict() {
     };
     let mut writer = CommonMarkWriter::with_options(options);
     let node = Node::Link {
-        url: "http://example.com".to_string(),
+        url: "http://example.com".into(),
         title: None,
-        content: vec![Node::Text("Link\nText".to_string())], // Newline in link text
+        content: vec![Node::Text("Link\nText".into())], // Newline in link text
     };
     match writer.write(&node) {
         Err(WriteError::NewlineInInlineElement(context)) => assert_eq!(context, "Link content"),
@@ -377,9 +370,9 @@ fn test_newline_in_link_text_non_strict() {
     };
     let mut writer = CommonMarkWriter::with_options(options);
     let node = Node::Link {
-        url: "http://example.com".to_string(),
+        url: "http://example.com".into(),
         title: None,
-        content: vec![Node::Text("Link\nText".to_string())], // Newline in link text
+        content: vec![Node::Text("Link\nText".into())], // Newline in link text
     };
     assert!(writer.write(&node).is_ok());
     // Output will contain the newline as per current non-strict behavior

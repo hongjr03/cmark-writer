@@ -8,7 +8,7 @@ use cmark_writer::{CodeBlockType, WriteError, WriterOptions};
 #[test]
 fn test_write_text() {
     let mut writer = CommonMarkWriter::new();
-    let text = Node::Text("Hello, World!".to_string());
+    let text = Node::Text("Hello, World!".into());
     writer.write(&text).unwrap();
     assert_eq!(writer.into_string(), "Hello, World!");
 }
@@ -21,7 +21,7 @@ fn test_write_escaped_text() {
             .escape_special_chars(true)
             .build(),
     );
-    let text = Node::Text("Special chars: * _ [ ] < > ` \\".to_string());
+    let text = Node::Text("Special chars: * _ [ ] < > ` \\".into());
     writer.write(&text).unwrap();
     assert_eq!(
         writer.into_string(),
@@ -32,7 +32,7 @@ fn test_write_escaped_text() {
 #[test]
 fn test_write_emphasis() {
     let mut writer = CommonMarkWriter::new();
-    let emphasis = Node::Emphasis(vec![Node::Text("emphasized".to_string())]);
+    let emphasis = Node::Emphasis(vec![Node::Text("emphasized".into())]);
     writer.write(&emphasis).unwrap();
     assert_eq!(writer.into_string(), "_emphasized_");
 }
@@ -40,7 +40,7 @@ fn test_write_emphasis() {
 #[test]
 fn test_write_strong() {
     let mut writer = CommonMarkWriter::new();
-    let strong = Node::Strong(vec![Node::Text("bold".to_string())]);
+    let strong = Node::Strong(vec![Node::Text("bold".into())]);
     writer.write(&strong).unwrap();
     assert_eq!(writer.into_string(), "**bold**");
 }
@@ -49,8 +49,8 @@ fn test_write_strong() {
 fn test_write_code_block() {
     let mut writer = CommonMarkWriter::new();
     let code_block = Node::CodeBlock {
-        language: Some("rust".to_string()),
-        content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+        language: Some("rust".into()),
+        content: "fn main() {\n    println!(\"Hello\");\n}".into(),
         block_type: cmark_writer::ast::CodeBlockType::Fenced,
     };
     writer.write(&code_block).unwrap();
@@ -65,7 +65,7 @@ fn test_write_indented_code_block() {
     let mut writer = CommonMarkWriter::new();
     let code_block = Node::CodeBlock {
         language: None,
-        content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+        content: "fn main() {\n    println!(\"Hello\");\n}".into(),
         block_type: CodeBlockType::Indented,
     };
     writer.write(&code_block).unwrap();
@@ -78,7 +78,7 @@ fn test_write_indented_code_block() {
 #[test]
 fn test_write_inline_code() {
     let mut writer = CommonMarkWriter::new();
-    let inline_code = Node::InlineCode("let x = 42;".to_string());
+    let inline_code = Node::InlineCode("let x = 42;".into());
     writer.write(&inline_code).unwrap();
     assert_eq!(writer.into_string(), "`let x = 42;`");
 }
@@ -88,7 +88,7 @@ fn test_write_heading() {
     let mut writer = CommonMarkWriter::new();
     let heading = Node::Heading {
         level: 2,
-        content: vec![Node::Text("Section Title".to_string())],
+        content: vec![Node::Text("Section Title".into())],
         heading_type: HeadingType::Atx, // 添加默认的 ATX 标题类型
     };
     writer.write(&heading).unwrap();
@@ -99,9 +99,9 @@ fn test_write_heading() {
 fn test_write_paragraph() {
     let mut writer = CommonMarkWriter::new();
     let paragraph = Node::Paragraph(vec![
-        Node::Text("This is a ".to_string()),
-        Node::Strong(vec![Node::Text("paragraph".to_string())]),
-        Node::Text(" with formatting.".to_string()),
+        Node::Text("This is a ".into()),
+        Node::Strong(vec![Node::Text("paragraph".into())]),
+        Node::Text(" with formatting.".into()),
     ]);
     writer.write(&paragraph).unwrap();
     assert_eq!(
@@ -115,10 +115,10 @@ fn test_write_unordered_list() {
     let mut writer = CommonMarkWriter::new();
     let list = Node::UnorderedList(vec![
         ListItem::Unordered {
-            content: vec![Node::Paragraph(vec![Node::Text("Item 1".to_string())])],
+            content: vec![Node::Paragraph(vec![Node::Text("Item 1".into())])],
         },
         ListItem::Unordered {
-            content: vec![Node::Paragraph(vec![Node::Text("Item 2".to_string())])],
+            content: vec![Node::Paragraph(vec![Node::Text("Item 2".into())])],
         },
     ]);
     writer.write(&list).unwrap();
@@ -129,9 +129,9 @@ fn test_write_unordered_list() {
 fn test_write_link() {
     let mut writer = CommonMarkWriter::new();
     let link = Node::Link {
-        url: "https://www.rust-lang.org".to_string(),
-        title: Some("Rust Website".to_string()),
-        content: vec![Node::Text("Rust".to_string())],
+        url: "https://www.rust-lang.org".into(),
+        title: Some("Rust Website".into()),
+        content: vec![Node::Text("Rust".into())],
     };
     writer.write(&link).unwrap();
     assert_eq!(
@@ -144,9 +144,9 @@ fn test_write_link() {
 fn test_write_image() {
     let mut writer = CommonMarkWriter::new();
     let image = Node::Image {
-        url: "image.png".to_string(),
-        title: Some("An image".to_string()),
-        alt: vec![Node::Text("Alt text".to_string())],
+        url: "image.png".into(),
+        title: Some("An image".into()),
+        alt: vec![Node::Text("Alt text".into())],
     };
     writer.write(&image).unwrap();
     assert_eq!(writer.into_string(), "![Alt text](image.png \"An image\")");
@@ -156,14 +156,14 @@ fn test_write_image() {
 fn test_write_image_with_formatted_alt() {
     let mut writer = CommonMarkWriter::new();
     let image = Node::Image {
-        url: "image.png".to_string(),
-        title: Some("An image with formatted alt text".to_string()),
+        url: "image.png".into(),
+        title: Some("An image with formatted alt text".into()),
         alt: vec![
-            Node::Text("Image with ".to_string()),
-            Node::Strong(vec![Node::Text("bold".to_string())]),
-            Node::Text(" and ".to_string()),
-            Node::Emphasis(vec![Node::Text("italic".to_string())]),
-            Node::Text(" text".to_string()),
+            Node::Text("Image with ".into()),
+            Node::Strong(vec![Node::Text("bold".into())]),
+            Node::Text(" and ".into()),
+            Node::Emphasis(vec![Node::Text("italic".into())]),
+            Node::Text(" text".into()),
         ],
     };
     writer.write(&image).unwrap();
@@ -195,18 +195,12 @@ fn test_writer_options() {
 fn test_write_table() {
     let mut writer = CommonMarkWriter::new();
     let table = Node::Table {
-        headers: vec![
-            Node::Text("Name".to_string()),
-            Node::Text("Age".to_string()),
-        ],
+        headers: vec![Node::Text("Name".into()), Node::Text("Age".into())],
         #[cfg(feature = "gfm")]
         alignments: vec![TableAlignment::Left, TableAlignment::Left],
         rows: vec![
-            vec![
-                Node::Text("Alice".to_string()),
-                Node::Text("30".to_string()),
-            ],
-            vec![Node::Text("Bob".to_string()), Node::Text("25".to_string())],
+            vec![Node::Text("Alice".into()), Node::Text("30".into())],
+            vec![Node::Text("Bob".into()), Node::Text("25".into())],
         ],
     };
 
@@ -217,7 +211,7 @@ fn test_write_table() {
 
 #[test]
 fn test_display_trait() {
-    let node = Node::Strong(vec![Node::Text("important".to_string())]);
+    let node = Node::Strong(vec![Node::Text("important".into())]);
     assert_eq!(format!("{}", node), "**important**");
 }
 
@@ -229,14 +223,12 @@ fn test_write_mixed_nested_lists() {
     let mixed_list = Node::UnorderedList(vec![
         // First level 1 item
         ListItem::Unordered {
-            content: vec![Node::Paragraph(vec![Node::Text(
-                "Level 1 item 1".to_string(),
-            )])],
+            content: vec![Node::Paragraph(vec![Node::Text("Level 1 item 1".into())])],
         },
         // Second level 1 item (with ordered sublist)
         ListItem::Unordered {
             content: vec![
-                Node::Paragraph(vec![Node::Text("Level 1 item 2".to_string())]),
+                Node::Paragraph(vec![Node::Text("Level 1 item 2".into())]),
                 Node::OrderedList {
                     start: 1,
                     items: vec![
@@ -244,20 +236,18 @@ fn test_write_mixed_nested_lists() {
                         ListItem::Ordered {
                             number: None,
                             content: vec![Node::Paragraph(vec![Node::Text(
-                                "Level 2 ordered item 1".to_string(),
+                                "Level 2 ordered item 1".into(),
                             )])],
                         },
                         // Second level 2 ordered item
                         ListItem::Ordered {
                             number: None,
                             content: vec![
-                                Node::Paragraph(vec![Node::Text(
-                                    "Level 2 ordered item 2".to_string(),
-                                )]),
+                                Node::Paragraph(vec![Node::Text("Level 2 ordered item 2".into())]),
                                 // Level 3 unordered list
                                 Node::UnorderedList(vec![ListItem::Unordered {
                                     content: vec![Node::Paragraph(vec![Node::Text(
-                                        "Level 3 unordered item".to_string(),
+                                        "Level 3 unordered item".into(),
                                     )])],
                                 }]),
                             ],
@@ -268,9 +258,7 @@ fn test_write_mixed_nested_lists() {
         },
         // Third level 1 item
         ListItem::Unordered {
-            content: vec![Node::Paragraph(vec![Node::Text(
-                "Level 1 item 3".to_string(),
-            )])],
+            content: vec![Node::Paragraph(vec![Node::Text("Level 1 item 3".into())])],
         },
     ]);
 
@@ -298,19 +286,19 @@ fn test_inline_elements_line_breaks() {
 
     // Test inline elements in a paragraph
     let paragraph = Node::Paragraph(vec![
-        Node::Text("This is ".to_string()),
-        Node::Strong(vec![Node::Text("bold".to_string())]),
-        Node::Text(" and ".to_string()),
-        Node::Emphasis(vec![Node::Text("emphasized".to_string())]),
-        Node::Text(" text with a ".to_string()),
+        Node::Text("This is ".into()),
+        Node::Strong(vec![Node::Text("bold".into())]),
+        Node::Text(" and ".into()),
+        Node::Emphasis(vec![Node::Text("emphasized".into())]),
+        Node::Text(" text with a ".into()),
         Node::Link {
-            url: "https://example.com".to_string(),
-            title: Some("Link title".to_string()),
-            content: vec![Node::Text("link".to_string())],
+            url: "https://example.com".into(),
+            title: Some("Link title".into()),
+            content: vec![Node::Text("link".into())],
         },
-        Node::Text(" and ".to_string()),
-        Node::InlineCode("some code".to_string()),
-        Node::Text(".".to_string()),
+        Node::Text(" and ".into()),
+        Node::InlineCode("some code".into()),
+        Node::Text(".".into()),
     ]);
 
     writer.write(&paragraph).unwrap();
@@ -324,21 +312,21 @@ fn test_inline_elements_line_breaks() {
     let list = Node::UnorderedList(vec![
         ListItem::Unordered {
             content: vec![Node::Paragraph(vec![
-                Node::Text("Item with ".to_string()),
-                Node::Strong(vec![Node::Text("bold".to_string())]),
-                Node::Text(" and ".to_string()),
-                Node::Emphasis(vec![Node::Text("emphasis".to_string())]),
+                Node::Text("Item with ".into()),
+                Node::Strong(vec![Node::Text("bold".into())]),
+                Node::Text(" and ".into()),
+                Node::Emphasis(vec![Node::Text("emphasis".into())]),
             ])],
         },
         ListItem::Unordered {
             content: vec![Node::Paragraph(vec![
-                Node::Text("Item with ".to_string()),
-                Node::InlineCode("code".to_string()),
-                Node::Text(" and a ".to_string()),
+                Node::Text("Item with ".into()),
+                Node::InlineCode("code".into()),
+                Node::Text(" and a ".into()),
                 Node::Link {
-                    url: "https://example.com".to_string(),
+                    url: "https://example.com".into(),
                     title: None,
-                    content: vec![Node::Text("link".to_string())],
+                    content: vec![Node::Text("link".into())],
                 },
             ])],
         },
@@ -357,28 +345,28 @@ fn test_inline_elements_line_breaks() {
 #[test]
 fn test_write_text_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
-    let text = Node::Text("Hello\nWorld".to_string());
+    let text = Node::Text("Hello\nWorld".into());
     assert!(writer.write(&text).is_err());
 }
 
 #[test]
 fn test_write_inline_code_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
-    let code = Node::InlineCode("let x = 1;\nlet y = 2;".to_string());
+    let code = Node::InlineCode("let x = 1;\nlet y = 2;".into());
     assert!(writer.write(&code).is_err());
 }
 
 #[test]
 fn test_write_emphasis_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
-    let emph = Node::Emphasis(vec![Node::Text("foo\nbar".to_string())]);
+    let emph = Node::Emphasis(vec![Node::Text("foo\nbar".into())]);
     assert!(writer.write(&emph).is_err());
 }
 
 #[test]
 fn test_write_strong_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
-    let strong = Node::Strong(vec![Node::Text("foo\nbar".to_string())]);
+    let strong = Node::Strong(vec![Node::Text("foo\nbar".into())]);
     assert!(writer.write(&strong).is_err());
 }
 
@@ -386,9 +374,9 @@ fn test_write_strong_with_newline_should_fail() {
 fn test_write_link_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
     let link = Node::Link {
-        url: "https://example.com".to_string(),
+        url: "https://example.com".into(),
         title: None,
-        content: vec![Node::Text("foo\nbar".to_string())],
+        content: vec![Node::Text("foo\nbar".into())],
     };
     assert!(writer.write(&link).is_err());
 }
@@ -397,9 +385,9 @@ fn test_write_link_with_newline_should_fail() {
 fn test_write_image_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
     let image = Node::Image {
-        url: "img.png".to_string(),
+        url: "img.png".into(),
         title: None,
-        alt: vec![Node::Text("foo\nbar".to_string())],
+        alt: vec![Node::Text("foo\nbar".into())],
     };
     assert!(writer.write(&image).is_err());
 }
@@ -408,10 +396,10 @@ fn test_write_image_with_newline_should_fail() {
 fn test_write_table_cell_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
     let table = Node::Table {
-        headers: vec![Node::Text("header".to_string())],
+        headers: vec![Node::Text("header".into())],
         #[cfg(feature = "gfm")]
         alignments: vec![TableAlignment::Left],
-        rows: vec![vec![Node::Text("foo\nbar".to_string())]],
+        rows: vec![vec![Node::Text("foo\nbar".into())]],
     };
     assert!(writer.write(&table).is_err());
 }
@@ -419,7 +407,7 @@ fn test_write_table_cell_with_newline_should_fail() {
 // #[test]
 // fn test_write_strike() {
 //     let mut writer = CommonMarkWriter::new();
-//     let strike = Node::Emphasis(vec![Node::Text("emphasis".to_string())]);
+//     let strike = Node::Emphasis(vec![Node::Text("emphasis".into())]);
 //     writer.write(&strike).unwrap();
 //     assert_eq!(writer.into_string(), "~~emphasis~~");
 // }
@@ -427,7 +415,7 @@ fn test_write_table_cell_with_newline_should_fail() {
 // #[test]
 // fn test_write_strike_with_newline_should_fail() {
 //     let mut writer = CommonMarkWriter::new();
-//     let strike = Node::Emphasis(vec![Node::Text("foo\nbar".to_string())]);
+//     let strike = Node::Emphasis(vec![Node::Text("foo\nbar".into())]);
 //     assert!(writer.write(&strike).is_err());
 // }
 
@@ -435,13 +423,13 @@ fn test_write_table_cell_with_newline_should_fail() {
 fn test_write_mixed_formatting() {
     let mut writer = CommonMarkWriter::new();
     let paragraph = Node::Paragraph(vec![
-        Node::Text("This is ".to_string()),
-        Node::Strong(vec![Node::Text("bold".to_string())]),
-        Node::Text(" and ".to_string()),
-        Node::Emphasis(vec![Node::Text("emphasized".to_string())]),
-        Node::Text(" and ".to_string()),
-        Node::Emphasis(vec![Node::Text("emphasis".to_string())]),
-        Node::Text(" text.".to_string()),
+        Node::Text("This is ".into()),
+        Node::Strong(vec![Node::Text("bold".into())]),
+        Node::Text(" and ".into()),
+        Node::Emphasis(vec![Node::Text("emphasized".into())]),
+        Node::Text(" and ".into()),
+        Node::Emphasis(vec![Node::Text("emphasis".into())]),
+        Node::Text(" text.".into()),
     ]);
 
     writer.write(&paragraph).unwrap();
@@ -455,13 +443,13 @@ fn test_write_mixed_formatting() {
 fn test_write_nested_formatting_with_strike() {
     let mut writer = CommonMarkWriter::new();
     let paragraph = Node::Paragraph(vec![
-        Node::Text("This contains ".to_string()),
+        Node::Text("This contains ".into()),
         Node::Emphasis(vec![
-            Node::Text("emphasis with ".to_string()),
-            Node::Strong(vec![Node::Text("bold".to_string())]),
-            Node::Text(" inside".to_string()),
+            Node::Text("emphasis with ".into()),
+            Node::Strong(vec![Node::Text("bold".into())]),
+            Node::Text(" inside".into()),
         ]),
-        Node::Text(".".to_string()),
+        Node::Text(".".into()),
     ]);
 
     writer.write(&paragraph).unwrap();
@@ -475,18 +463,18 @@ fn test_write_nested_formatting_with_strike() {
 fn test_write_html_element() {
     let mut writer = CommonMarkWriter::new();
     let html_element = Node::HtmlElement(HtmlElement {
-        tag: "div".to_string(),
+        tag: "div".into(),
         attributes: vec![
             HtmlAttribute {
-                name: "class".to_string(),
-                value: "container".to_string(),
+                name: "class".into(),
+                value: "container".into(),
             },
             HtmlAttribute {
-                name: "id".to_string(),
-                value: "main".to_string(),
+                name: "id".into(),
+                value: "main".into(),
             },
         ],
-        children: vec![Node::Text("内容".to_string())],
+        children: vec![Node::Text("内容".into())],
         self_closing: false,
     });
 
@@ -501,15 +489,15 @@ fn test_write_html_element() {
 fn test_write_self_closing_html_element() {
     let mut writer = CommonMarkWriter::new();
     let img = Node::HtmlElement(HtmlElement {
-        tag: "img".to_string(),
+        tag: "img".into(),
         attributes: vec![
             HtmlAttribute {
-                name: "src".to_string(),
-                value: "image.jpg".to_string(),
+                name: "src".into(),
+                value: "image.jpg".into(),
             },
             HtmlAttribute {
-                name: "alt".to_string(),
-                value: "图片描述".to_string(),
+                name: "alt".into(),
+                value: "图片描述".into(),
             },
         ],
         children: vec![],
@@ -527,23 +515,23 @@ fn test_write_self_closing_html_element() {
 fn test_nested_html_elements() {
     let mut writer = CommonMarkWriter::new();
     let nested_element = Node::HtmlElement(HtmlElement {
-        tag: "div".to_string(),
+        tag: "div".into(),
         attributes: vec![HtmlAttribute {
-            name: "class".to_string(),
-            value: "outer".to_string(),
+            name: "class".into(),
+            value: "outer".into(),
         }],
         children: vec![
-            Node::Text("开始 ".to_string()),
+            Node::Text("开始 ".into()),
             Node::HtmlElement(HtmlElement {
-                tag: "span".to_string(),
+                tag: "span".into(),
                 attributes: vec![HtmlAttribute {
-                    name: "class".to_string(),
-                    value: "inner".to_string(),
+                    name: "class".into(),
+                    value: "inner".into(),
                 }],
-                children: vec![Node::Text("嵌套内容".to_string())],
+                children: vec![Node::Text("嵌套内容".into())],
                 self_closing: false,
             }),
-            Node::Text(" 结束".to_string()),
+            Node::Text(" 结束".into()),
         ],
         self_closing: false,
     });
@@ -559,9 +547,9 @@ fn test_nested_html_elements() {
 fn test_html_element_with_unsafe_tag() {
     let mut writer = CommonMarkWriter::new();
     let html_element = Node::HtmlElement(HtmlElement {
-        tag: "script<dangerous>".to_string(), // 不安全的标签名
+        tag: "script<dangerous>".into(), // 不安全的标签名
         attributes: vec![],
-        children: vec![Node::Text("alert('危险代码')".to_string())],
+        children: vec![Node::Text("alert('危险代码')".into())],
         self_closing: false,
     });
 
@@ -581,10 +569,10 @@ fn test_html_element_with_unsafe_attribute() {
         ..Default::default()
     });
     let html_element = Node::HtmlElement(HtmlElement {
-        tag: "div".to_string(),
+        tag: "div".into(),
         attributes: vec![HtmlAttribute {
-            name: "on<click>".to_string(), // 不安全的属性名
-            value: "alert('危险')".to_string(),
+            name: "on<click>".into(), // 不安全的属性名
+            value: "alert('危险')".into(),
         }],
         children: vec![],
         self_closing: false,
@@ -604,12 +592,12 @@ fn test_html_element_with_unsafe_attribute() {
 fn test_html_attribute_value_escaping() {
     let mut writer = CommonMarkWriter::new();
     let html_element = Node::HtmlElement(HtmlElement {
-        tag: "div".to_string(),
+        tag: "div".into(),
         attributes: vec![HtmlAttribute {
-            name: "data-text".to_string(),
-            value: "引号\"和<标签>以及&符号".to_string(),
+            name: "data-text".into(),
+            value: "引号\"和<标签>以及&符号".into(),
         }],
-        children: vec![Node::Text("内容".to_string())],
+        children: vec![Node::Text("内容".into())],
         self_closing: false,
     });
 
@@ -628,11 +616,11 @@ fn test_write_ordered_list() {
         items: vec![
             ListItem::Ordered {
                 number: None,
-                content: vec![Node::Paragraph(vec![Node::Text("第一项".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("第一项".into())])],
             },
             ListItem::Ordered {
                 number: None,
-                content: vec![Node::Paragraph(vec![Node::Text("第二项".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("第二项".into())])],
             },
         ],
     };
@@ -648,17 +636,15 @@ fn test_write_ordered_list_with_custom_number() {
         items: vec![
             ListItem::Ordered {
                 number: None,
-                content: vec![Node::Paragraph(vec![Node::Text("第一项".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("第一项".into())])],
             },
             ListItem::Ordered {
                 number: Some(5), // Use custom number
-                content: vec![Node::Paragraph(vec![Node::Text(
-                    "从 5 开始的项".to_string(),
-                )])],
+                content: vec![Node::Paragraph(vec![Node::Text("从 5 开始的项".into())])],
             },
             ListItem::Ordered {
                 number: None, // Continue incrementing from previous number
-                content: vec![Node::Paragraph(vec![Node::Text("自动递增项".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("自动递增项".into())])],
             },
         ],
     };
@@ -677,16 +663,14 @@ fn test_mixed_ordered_and_unordered_items() {
         items: vec![
             ListItem::Ordered {
                 number: None,
-                content: vec![Node::Paragraph(vec![Node::Text(
-                    "从 10 开始的项".to_string(),
-                )])],
+                content: vec![Node::Paragraph(vec![Node::Text("从 10 开始的项".into())])],
             },
             ListItem::Unordered {
-                content: vec![Node::Paragraph(vec![Node::Text("无序列表项".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("无序列表项".into())])],
             },
             ListItem::Ordered {
                 number: Some(20), // Custom number jumps to 20
-                content: vec![Node::Paragraph(vec![Node::Text("跳跃到 20".to_string())])],
+                content: vec![Node::Paragraph(vec![Node::Text("跳跃到 20".into())])],
             },
         ],
     };
@@ -701,7 +685,7 @@ fn test_mixed_ordered_and_unordered_items() {
 fn test_write_uri_autolink() {
     let mut writer = CommonMarkWriter::new();
     let autolink = Node::Autolink {
-        url: "https://www.example.com".to_string(),
+        url: "https://www.example.com".into(),
         is_email: false,
     };
     writer.write(&autolink).unwrap();
@@ -712,7 +696,7 @@ fn test_write_uri_autolink() {
 fn test_write_uri_autolink_without_scheme() {
     let mut writer = CommonMarkWriter::new();
     let autolink = Node::Autolink {
-        url: "www.example.com".to_string(),
+        url: "www.example.com".into(),
         is_email: false,
     };
     writer.write(&autolink).unwrap();
@@ -723,7 +707,7 @@ fn test_write_uri_autolink_without_scheme() {
 fn test_write_email_autolink() {
     let mut writer = CommonMarkWriter::new();
     let autolink = Node::Autolink {
-        url: "user@example.com".to_string(),
+        url: "user@example.com".into(),
         is_email: true,
     };
     writer.write(&autolink).unwrap();
@@ -734,7 +718,7 @@ fn test_write_email_autolink() {
 fn test_autolink_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
     let autolink = Node::Autolink {
-        url: "https://example.com\nwith-newline".to_string(),
+        url: "https://example.com\nwith-newline".into(),
         is_email: false,
     };
     assert!(writer.write(&autolink).is_err());
@@ -744,17 +728,17 @@ fn test_autolink_with_newline_should_fail() {
 fn test_autolink_in_paragraph() {
     let mut writer = CommonMarkWriter::new();
     let paragraph = Node::Paragraph(vec![
-        Node::Text("Visit ".to_string()),
+        Node::Text("Visit ".into()),
         Node::Autolink {
-            url: "https://www.example.com".to_string(),
+            url: "https://www.example.com".into(),
             is_email: false,
         },
-        Node::Text(" or contact ".to_string()),
+        Node::Text(" or contact ".into()),
         Node::Autolink {
-            url: "user@example.com".to_string(),
+            url: "user@example.com".into(),
             is_email: true,
         },
-        Node::Text(" for more information.".to_string()),
+        Node::Text(" for more information.".into()),
     ]);
 
     writer.write(&paragraph).unwrap();
@@ -768,9 +752,9 @@ fn test_autolink_in_paragraph() {
 fn test_write_link_reference_definition() {
     let mut writer = CommonMarkWriter::new();
     let link_ref_def = Node::LinkReferenceDefinition {
-        label: "foo".to_string(),
-        destination: "/url".to_string(),
-        title: Some("title".to_string()),
+        label: "foo".into(),
+        destination: "/url".into(),
+        title: Some("title".into()),
     };
     writer.write(&link_ref_def).unwrap();
     assert_eq!(writer.into_string(), "[foo]: /url \"title\"\n");
@@ -780,8 +764,8 @@ fn test_write_link_reference_definition() {
 fn test_write_link_reference_definition_no_title() {
     let mut writer = CommonMarkWriter::new();
     let link_ref_def = Node::LinkReferenceDefinition {
-        label: "bar".to_string(),
-        destination: "https://example.com".to_string(),
+        label: "bar".into(),
+        destination: "https://example.com".into(),
         title: None,
     };
     writer.write(&link_ref_def).unwrap();
@@ -792,8 +776,8 @@ fn test_write_link_reference_definition_no_title() {
 fn test_write_reference_link() {
     let mut writer = CommonMarkWriter::new();
     let ref_link = Node::ReferenceLink {
-        label: "foo".to_string(),
-        content: vec![Node::Text("Link text".to_string())],
+        label: "foo".into(),
+        content: vec![Node::Text("Link text".into())],
     };
     writer.write(&ref_link).unwrap();
     assert_eq!(writer.into_string(), "[Link text][foo]");
@@ -804,8 +788,8 @@ fn test_write_shortcut_reference_link() {
     let mut writer = CommonMarkWriter::new();
     // When content is the same as label, it's a shortcut reference
     let ref_link = Node::ReferenceLink {
-        label: "foo".to_string(),
-        content: vec![Node::Text("foo".to_string())],
+        label: "foo".into(),
+        content: vec![Node::Text("foo".into())],
     };
     writer.write(&ref_link).unwrap();
     assert_eq!(writer.into_string(), "[foo]");
@@ -813,7 +797,7 @@ fn test_write_shortcut_reference_link() {
     // Empty content also produces a shortcut reference
     let mut writer = CommonMarkWriter::new();
     let ref_link = Node::ReferenceLink {
-        label: "bar".to_string(),
+        label: "bar".into(),
         content: vec![],
     };
     writer.write(&ref_link).unwrap();
@@ -824,12 +808,12 @@ fn test_write_shortcut_reference_link() {
 fn test_reference_link_in_paragraph() {
     let mut writer = CommonMarkWriter::new();
     let paragraph = Node::Paragraph(vec![
-        Node::Text("See ".to_string()),
+        Node::Text("See ".into()),
         Node::ReferenceLink {
-            label: "example".to_string(),
-            content: vec![Node::Text("this example".to_string())],
+            label: "example".into(),
+            content: vec![Node::Text("this example".into())],
         },
-        Node::Text(" for more information.".to_string()),
+        Node::Text(" for more information.".into()),
     ]);
 
     writer.write(&paragraph).unwrap();
@@ -844,25 +828,25 @@ fn test_document_with_reference_links() {
     let mut writer = CommonMarkWriter::new();
     let doc = Node::Document(vec![
         Node::LinkReferenceDefinition {
-            label: "example".to_string(),
-            destination: "/example".to_string(),
-            title: Some("Example Page".to_string()),
+            label: "example".into(),
+            destination: "/example".into(),
+            title: Some("Example Page".into()),
         },
         Node::Paragraph(vec![
-            Node::Text("See ".to_string()),
+            Node::Text("See ".into()),
             Node::ReferenceLink {
-                label: "example".to_string(),
-                content: vec![Node::Text("this example".to_string())],
+                label: "example".into(),
+                content: vec![Node::Text("this example".into())],
             },
-            Node::Text(".".to_string()),
+            Node::Text(".".into()),
         ]),
         Node::Paragraph(vec![
-            Node::Text("Or just click ".to_string()),
+            Node::Text("Or just click ".into()),
             Node::ReferenceLink {
-                label: "example".to_string(),
-                content: vec![Node::Text("example".to_string())],
+                label: "example".into(),
+                content: vec![Node::Text("example".into())],
             },
-            Node::Text(".".to_string()),
+            Node::Text(".".into()),
         ]),
     ]);
 
@@ -884,26 +868,26 @@ fn test_nested_leaf_blocks_with_indentation() {
 
     let list = Node::UnorderedList(vec![
         ListItem::Unordered {
-            content: vec![Node::Paragraph(vec![Node::Text("普通段落".to_string())])],
+            content: vec![Node::Paragraph(vec![Node::Text("普通段落".into())])],
         },
         ListItem::Unordered {
             content: vec![Node::Heading {
                 level: 3,
-                content: vec![Node::Text("列表中的标题".to_string())],
+                content: vec![Node::Text("列表中的标题".into())],
                 heading_type: HeadingType::Atx, // 添加默认的 ATX 标题类型
             }],
         },
         ListItem::Unordered {
             content: vec![Node::CodeBlock {
                 language: None,
-                content: "function test() {\n  console.log('Hello');\n}".to_string(),
+                content: "function test() {\n  console.log('Hello');\n}".into(),
                 block_type: cmark_writer::ast::CodeBlockType::Indented,
             }],
         },
         ListItem::Unordered {
             content: vec![Node::CodeBlock {
-                language: Some("rust".to_string()),
-                content: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
+                language: Some("rust".into()),
+                content: "fn main() {\n    println!(\"Hello\");\n}".into(),
                 block_type: cmark_writer::ast::CodeBlockType::Fenced,
             }],
         },
@@ -911,15 +895,13 @@ fn test_nested_leaf_blocks_with_indentation() {
             content: vec![Node::ThematicBreak],
         },
         ListItem::Unordered {
-            content: vec![Node::HtmlBlock(
-                "<div>\n  <p>HTML 内容</p>\n</div>".to_string(),
-            )],
+            content: vec![Node::HtmlBlock("<div>\n  <p>HTML 内容</p>\n</div>".into())],
         },
         ListItem::Unordered {
             content: vec![Node::LinkReferenceDefinition {
-                label: "link".to_string(),
-                destination: "https://example.com".to_string(),
-                title: Some("示例链接".to_string()),
+                label: "link".into(),
+                destination: "https://example.com".into(),
+                title: Some("示例链接".into()),
             }],
         },
     ]);
@@ -952,16 +934,16 @@ fn test_nested_blockquote_with_indentation() {
     let mut writer = CommonMarkWriter::new();
 
     let blockquote = Node::BlockQuote(vec![
-        Node::Paragraph(vec![Node::Text("外部引用第一段落".to_string())]),
+        Node::Paragraph(vec![Node::Text("外部引用第一段落".into())]),
         Node::BlockQuote(vec![
-            Node::Paragraph(vec![Node::Text("内部引用段落".to_string())]),
+            Node::Paragraph(vec![Node::Text("内部引用段落".into())]),
             Node::CodeBlock {
-                language: Some("js".to_string()),
-                content: "function nested() {\n  console.log('嵌套代码');\n}".to_string(),
+                language: Some("js".into()),
+                content: "function nested() {\n  console.log('嵌套代码');\n}".into(),
                 block_type: cmark_writer::ast::CodeBlockType::Fenced,
             },
         ]),
-        Node::Paragraph(vec![Node::Text("外部引用第二段落".to_string())]),
+        Node::Paragraph(vec![Node::Text("外部引用第二段落".into())]),
     ]);
 
     writer.write(&blockquote).unwrap();
@@ -988,28 +970,28 @@ fn test_nested_mixed_containers() {
     let mut writer = CommonMarkWriter::new();
 
     let mixed_containers = Node::BlockQuote(vec![
-        Node::Paragraph(vec![Node::Text("引用块中的段落".to_string())]),
+        Node::Paragraph(vec![Node::Text("引用块中的段落".into())]),
         Node::UnorderedList(vec![
             ListItem::Unordered {
                 content: vec![
-                    Node::Paragraph(vec![Node::Text("列表项 1".to_string())]),
+                    Node::Paragraph(vec![Node::Text("列表项 1".into())]),
                     Node::BlockQuote(vec![Node::Paragraph(vec![Node::Text(
-                        "列表项中的引用块".to_string(),
+                        "列表项中的引用块".into(),
                     )])]),
                 ],
             },
             ListItem::Unordered {
                 content: vec![
-                    Node::Paragraph(vec![Node::Text("列表项 2".to_string())]),
+                    Node::Paragraph(vec![Node::Text("列表项 2".into())]),
                     Node::CodeBlock {
                         language: None,
-                        content: "code in list item".to_string(),
+                        content: "code in list item".into(),
                         block_type: CodeBlockType::Indented,
                     },
                 ],
             },
         ]),
-        Node::Paragraph(vec![Node::Text("引用块的最后一段".to_string())]),
+        Node::Paragraph(vec![Node::Text("引用块的最后一段".into())]),
     ]);
 
     writer.write(&mixed_containers).unwrap();
