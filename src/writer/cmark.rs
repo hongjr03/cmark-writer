@@ -316,8 +316,23 @@ impl CommonMarkWriter {
 
     /// Write a paragraph node
     pub(crate) fn write_paragraph(&mut self, content: &[Node]) -> WriteResult<()> {
-        for node in content.iter() {
-            self.write(node)?;
+        if self.options.trim_paragraph_trailing_hard_breaks {
+            let mut last_non_hard_break_index = content.len();
+
+            while last_non_hard_break_index > 0 {
+                if !matches!(content[last_non_hard_break_index - 1], Node::HardBreak) {
+                    break;
+                }
+                last_non_hard_break_index -= 1;
+            }
+
+            for node in content.iter().take(last_non_hard_break_index) {
+                self.write(node)?;
+            }
+        } else {
+            for node in content {
+                self.write(node)?;
+            }
         }
 
         Ok(())

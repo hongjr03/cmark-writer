@@ -24,6 +24,8 @@ pub struct WriterOptions {
     pub strong_char: char,
     /// Whether to escape special characters in text content
     pub escape_special_chars: bool,
+    /// Whether to trim trailing hard breaks from paragraphs
+    pub trim_paragraph_trailing_hard_breaks: bool,
 
     /// Whether to enable GitHub Flavored Markdown (GFM) extensions
     #[cfg(feature = "gfm")]
@@ -61,6 +63,7 @@ impl Default for WriterOptions {
             emphasis_char: '_',
             strong_char: '*',
             escape_special_chars: false,
+            trim_paragraph_trailing_hard_breaks: true,
 
             #[cfg(feature = "gfm")]
             enable_gfm: false,
@@ -135,6 +138,12 @@ impl WriterOptionsBuilder {
     /// Set whether to escape special characters in text content
     pub fn escape_special_chars(mut self, escape: bool) -> Self {
         self.options.escape_special_chars = escape;
+        self
+    }
+
+    /// Set whether to trim trailing hard breaks from paragraphs
+    pub fn trim_paragraph_trailing_hard_breaks(mut self, trim: bool) -> Self {
+        self.options.trim_paragraph_trailing_hard_breaks = trim;
         self
     }
 
