@@ -2,6 +2,29 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.7] - 2025-06-16
+
+### Features
+
+- Added `trim_paragraph_trailing_hard_breaks` option to `WriterOptions` for controlling paragraph trailing hard break behavior
+- New option allows users to choose whether to preserve or remove trailing hard breaks at the end of paragraphs
+- Default behavior remains unchanged (trailing hard breaks are trimmed) for backward compatibility
+
+### API Changes
+
+- Added `trim_paragraph_trailing_hard_breaks: bool` field to `WriterOptions` (default: `true`)
+- Added `trim_paragraph_trailing_hard_breaks()` method to `WriterOptionsBuilder`
+
+### Tests
+
+- Added comprehensive test suite for paragraph trailing hard break behavior
+- Created example demonstrating the new functionality
+
+### Bug Fixes
+
+- Fixed tinymist issue #1818
+- now users can control this behavior via options
+
 ## [0.7.6] - 2025-06-14
 
 ### Performance Improvements
