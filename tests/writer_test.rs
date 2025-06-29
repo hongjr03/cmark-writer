@@ -216,6 +216,128 @@ fn test_display_trait() {
 }
 
 #[test]
+fn test_table_with_block_elements_strict_mode() {
+    let mut writer =
+        CommonMarkWriter::with_options(WriterOptionsBuilder::new().strict(true).build());
+
+    // Create a table with a code block in a cell (block-level element)
+    let table = Node::Table {
+        headers: vec![Node::Text("Header 1".into()), Node::Text("Header 2".into())],
+        #[cfg(feature = "gfm")]
+        alignments: vec![],
+        rows: vec![vec![
+            Node::Text("Regular text".into()),
+            Node::CodeBlock {
+                language: Some("rust".into()),
+                content: "fn main() {\n    println!(\"Hello\");\n}".into(),
+                block_type: CodeBlockType::Fenced,
+            },
+        ]],
+    };
+
+    // In strict mode, this should fail because code blocks are block-level elements
+    let result = writer.write(&table);
+    assert!(result.is_err());
+    if let Err(WriteError::InvalidStructure(msg)) = result {
+        assert!(msg.contains("block-level elements"));
+    } else {
+        panic!("Expected InvalidStructure error, got: {:?}", result);
+    }
+}
+
+#[test]
+fn test_table_with_block_elements_soft_mode_fallback() {
+    let mut writer = CommonMarkWriter::with_options(
+        WriterOptionsBuilder::new()
+            .strict(false) // Enable soft mode
+            .build(),
+    );
+
+    // Create a table with a code block in a cell (block-level element)
+    let table = Node::Table {
+        headers: vec![Node::Text("Header 1".into()), Node::Text("Header 2".into())],
+        #[cfg(feature = "gfm")]
+        alignments: vec![],
+        rows: vec![vec![
+            Node::Text("Regular text".into()),
+            Node::CodeBlock {
+                language: Some("rust".into()),
+                content: "fn main() {\n    println!(\"Hello\");\n}".into(),
+                block_type: CodeBlockType::Fenced,
+            },
+        ]],
+    };
+
+    // In soft mode, this should fallback to HTML output
+    writer.write(&table).unwrap();
+    let output = writer.into_string();
+    println!("{}", output);
+
+    // Should generate HTML table instead of markdown
+    assert!(output.contains("<table>"));
+    assert!(output.contains("<thead>"));
+    assert!(output.contains("<tbody>"));
+    assert!(output.contains("<th>Header 1</th>"));
+    assert!(output.contains("<th>Header 2</th>"));
+    assert!(output.contains("<td>Regular text</td>"));
+    assert!(output.contains("<pre><code class=\"language-rust\">"));
+    assert!(output.contains("fn main()"));
+}
+
+#[test]
+fn test_table_with_paragraph_in_cell_soft_mode() {
+    let mut writer =
+        CommonMarkWriter::with_options(WriterOptionsBuilder::new().strict(false).build());
+
+    // Create a table with a paragraph in a cell (block-level element)
+    let table = Node::Table {
+        headers: vec![Node::Text("Column 1".into()), Node::Text("Column 2".into())],
+        #[cfg(feature = "gfm")]
+        alignments: vec![],
+        rows: vec![vec![
+            Node::Paragraph(vec![Node::Text(
+                "This is a paragraph in a table cell".into(),
+            )]),
+            Node::Text("Simple text".into()),
+        ]],
+    };
+
+    // Should fallback to HTML in soft mode
+    writer.write(&table).unwrap();
+    let output = writer.into_string();
+
+    assert!(output.contains("<table>"));
+    assert!(output.contains("<p>This is a paragraph in a table cell</p>"));
+}
+
+#[test]
+fn test_table_with_only_inline_elements_no_fallback() {
+    let mut writer =
+        CommonMarkWriter::with_options(WriterOptionsBuilder::new().strict(false).build());
+
+    // Create a table with only inline elements
+    let table = Node::Table {
+        headers: vec![Node::Text("Name".into()), Node::Text("Age".into())],
+        #[cfg(feature = "gfm")]
+        alignments: vec![],
+        rows: vec![vec![
+            Node::Strong(vec![Node::Text("Alice".into())]),
+            Node::Emphasis(vec![Node::Text("30".into())]),
+        ]],
+    };
+
+    // Should use regular markdown table syntax (no fallback needed)
+    writer.write(&table).unwrap();
+    let output = writer.into_string();
+
+    // Should generate markdown table, not HTML
+    assert!(output.contains("| Name | Age |"));
+    assert!(output.contains("| --- | --- |"));
+    assert!(output.contains("| **Alice** | _30_ |"));
+    assert!(!output.contains("<table>"));
+}
+
+#[test]
 fn test_write_mixed_nested_lists() {
     let mut writer = CommonMarkWriter::new();
 

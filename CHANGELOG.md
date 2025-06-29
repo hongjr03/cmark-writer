@@ -2,6 +2,37 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.8] - 2025-06-29
+
+### Features
+
+- **HTML Fallback for Tables with Block Elements**: Added intelligent HTML fallback mechanism for tables containing block-level elements in soft mode
+- Tables with block-level elements (paragraphs, code blocks, lists, etc.) now automatically fall back to HTML table rendering in soft mode (`strict: false`)
+- Enhanced table rendering capabilities to support complex content that cannot be represented in Markdown table syntax
+
+### API Changes
+
+- Added `table_contains_block_elements()` method for detecting block-level elements in table content
+- Added `write_table_as_html()` and `write_table_as_html_with_alignment()` methods for HTML table fallback
+- Added `HtmlFallbackError` error variant for HTML fallback rendering failures
+
+### Behavior Changes
+
+- **Strict Mode** (`strict: true`): Tables with block elements now fail immediately with `InvalidStructure` error
+- **Soft Mode** (`strict: false`): Tables with block elements automatically fall back to HTML output while preserving full content structure
+- Tables with only inline elements continue to use standard Markdown table syntax regardless of mode
+
+### Tests
+
+- Added comprehensive test suite for HTML fallback functionality
+- Tests cover strict mode error handling, soft mode HTML fallback, and inline-only table preservation
+- All existing tests continue to pass, ensuring backward compatibility
+
+### Bug Fixes
+
+- Addressed issue where tables containing block-level elements would fail to render properly in CommonMark format
+- Related to tinymist issue #1845 regarding typlite grid rendering with complex content
+
 ## [0.7.7] - 2025-06-16
 
 ### Features

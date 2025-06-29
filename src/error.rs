@@ -31,6 +31,8 @@ pub enum WriteError {
     InvalidHtmlAttribute(EcoString),
     /// An error occurred during dedicated HTML rendering.
     HtmlRenderingError(CoreHtmlWriteError),
+    /// An error occurred during HTML fallback rendering for tables with block elements.
+    HtmlFallbackError(EcoString),
     /// A custom error with a message and optional error code.
     Custom {
         /// Custom error message
@@ -69,6 +71,9 @@ impl Display for WriteError {
             },
             WriteError::HtmlRenderingError(html_err) => {
                 write!(f, "Error during HTML rendering phase: {}", html_err)
+            },
+            WriteError::HtmlFallbackError(msg) => {
+                write!(f, "Error during HTML fallback rendering: {}", msg)
             },
             WriteError::Custom { message, code } => {
                 if let Some(code) = code {

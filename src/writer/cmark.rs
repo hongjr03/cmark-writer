@@ -206,6 +206,18 @@ impl CommonMarkWriter {
         }
     }
 
+    /// Check if a table contains any block-level elements in headers or cells
+    fn table_contains_block_elements(headers: &[Node], rows: &[Vec<Node>]) -> bool {
+        // Check headers for block elements
+        if headers.iter().any(|node| node.is_block()) {
+            return true;
+        }
+
+        // Check all cells in all rows for block elements
+        rows.iter()
+            .any(|row| row.iter().any(|node| node.is_block()))
+    }
+
     /// Writes text content with character escaping
     pub(crate) fn write_text_content(&mut self, content: &str) -> WriteResult<()> {
         if self.options.escape_special_chars {
@@ -540,6 +552,24 @@ impl CommonMarkWriter {
 
     /// Write a table
     pub(crate) fn write_table(&mut self, headers: &[Node], rows: &[Vec<Node>]) -> WriteResult<()> {
+        // Check if table contains block elements
+        if Self::table_contains_block_elements(headers, rows) {
+            if self.is_strict_mode() {
+                // In strict mode, fail immediately if block elements are present
+                return Err(WriteError::InvalidStructure(
+                    "Table contains block-level elements which are not allowed in strict mode"
+                        .to_string()
+                        .into(),
+                ));
+            } else {
+                // In soft mode, fallback to HTML
+                log::info!(
+                    "Table contains block-level elements, falling back to HTML output in soft mode"
+                );
+                return self.write_table_as_html(headers, rows);
+            }
+        }
+
         // Write header
         self.write_char('|')?;
         for header in headers {
@@ -583,6 +613,22 @@ impl CommonMarkWriter {
         // Only use alignment when GFM tables are enabled
         if !self.options.gfm_tables {
             return self.write_table(headers, rows);
+        }
+
+        // Check if table contains block elements
+        if Self::table_contains_block_elements(headers, rows) {
+            if self.is_strict_mode() {
+                // In strict mode, fail immediately if block elements are present
+                return Err(WriteError::InvalidStructure(
+                    "GFM table contains block-level elements which are not allowed in strict mode"
+                        .to_string()
+                        .into(),
+                ));
+            } else {
+                // In soft mode, fallback to HTML
+                log::info!("GFM table contains block-level elements, falling back to HTML output in soft mode");
+                return self.write_table_as_html_with_alignment(headers, alignments, rows);
+            }
         }
 
         // Write header
@@ -1043,6 +1089,61 @@ impl<E: Escapes> std::fmt::Display for Escaped<'_, E> {
                 write!(f, "{}", c)?;
             }
         }
+        Ok(())
+    }
+}
+
+impl CommonMarkWriter {
+    /// Write a table as HTML (fallback for tables with block-level elements)
+    fn write_table_as_html(&mut self, headers: &[Node], rows: &[Vec<Node>]) -> WriteResult<()> {
+        use crate::writer::html::HtmlWriter;
+
+        let mut html_writer = HtmlWriter::new();
+
+        // Create table node for HTML writer
+        let table_node = Node::Table {
+            headers: headers.to_vec(),
+            #[cfg(feature = "gfm")]
+            alignments: vec![],
+            rows: rows.to_vec(),
+        };
+
+        html_writer.write_node(&table_node).map_err(|_| {
+            WriteError::HtmlFallbackError("Failed to write table as HTML".to_string().into())
+        })?;
+
+        let html_output = html_writer.into_string();
+        self.buffer.push_str(&html_output);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "gfm")]
+    /// Write a GFM table with alignment as HTML (fallback for tables with block-level elements)
+    fn write_table_as_html_with_alignment(
+        &mut self,
+        headers: &[Node],
+        alignments: &[TableAlignment],
+        rows: &[Vec<Node>],
+    ) -> WriteResult<()> {
+        use crate::writer::html::HtmlWriter;
+
+        let mut html_writer = HtmlWriter::new();
+
+        // Create table node for HTML writer
+        let table_node = Node::Table {
+            headers: headers.to_vec(),
+            alignments: alignments.to_vec(),
+            rows: rows.to_vec(),
+        };
+
+        html_writer.write_node(&table_node).map_err(|_| {
+            WriteError::HtmlFallbackError("Failed to write GFM table as HTML".to_string().into())
+        })?;
+
+        let html_output = html_writer.into_string();
+        self.buffer.push_str(&html_output);
+
         Ok(())
     }
 }
