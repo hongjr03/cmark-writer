@@ -56,17 +56,52 @@ impl Default for HtmlWriterOptions {
     }
 }
 
-#[cfg(feature = "gfm")]
 impl HtmlWriterOptions {
+    /// Sets the code block language class prefix.
+    pub fn with_code_block_prefix<S: Into<EcoString>>(mut self, prefix: Option<S>) -> Self {
+        self.code_block_language_class_prefix = prefix.map(|p| p.into());
+        self
+    }
+
+    /// Sets strict mode.
+    pub fn with_strict(mut self, strict: bool) -> Self {
+        self.strict = strict;
+        self
+    }
+
+    /// Sets the code block language class prefix.
+    pub fn set_code_block_prefix<S: Into<EcoString>>(&mut self, prefix: Option<S>) {
+        self.code_block_language_class_prefix = prefix.map(|p| p.into());
+    }
+
+    /// Sets strict mode.
+    pub fn set_strict(&mut self, strict: bool) {
+        self.strict = strict;
+    }
+
     /// Enables GFM-specific HTML rendering behaviors.
-    pub fn enable_gfm(mut self, enable: bool) -> Self {
+    #[cfg(feature = "gfm")]
+    pub fn with_gfm_enabled(mut self, enable: bool) -> Self {
         self.enable_gfm = enable;
         self
     }
 
-    /// A list of HTML tags that should be rendered as text when GFM is enabled.
-    pub fn gfm_disallowed_html_tags(mut self, tags: Vec<EcoString>) -> Self {
+    /// Sets GFM-specific HTML rendering behaviors.
+    #[cfg(feature = "gfm")]
+    pub fn set_gfm_enabled(&mut self, enable: bool) {
+        self.enable_gfm = enable;
+    }
+
+    /// Sets the list of HTML tags that should be rendered as text when GFM is enabled.
+    #[cfg(feature = "gfm")]
+    pub fn with_gfm_disallowed_tags(mut self, tags: Vec<EcoString>) -> Self {
         self.gfm_disallowed_html_tags = tags;
         self
+    }
+
+    /// Sets the list of HTML tags that should be rendered as text when GFM is enabled.
+    #[cfg(feature = "gfm")]
+    pub fn set_gfm_disallowed_tags(&mut self, tags: Vec<EcoString>) {
+        self.gfm_disallowed_html_tags = tags;
     }
 }

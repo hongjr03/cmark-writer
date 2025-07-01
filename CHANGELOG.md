@@ -2,6 +2,71 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.7.9] - 2025-07-01
+
+### Features
+
+- **Flexible HtmlWriterOptions in CommonMarkWriter**: Added support for custom `HtmlWriterOptions` when rendering `HtmlElement` nodes in CommonMark mode
+- **Runtime HtmlWriter Options Modification**: Added methods to modify `HtmlWriter` options at runtime for greater flexibility
+- **Enhanced HtmlWriterOptions API**: Added builder-style methods and convenience functions for configuring HTML rendering options
+
+### API Changes
+
+#### WriterOptions
+- Added `html_writer_options: Option<HtmlWriterOptions>` field to `WriterOptions`
+- Added `html_writer_options()` method to `WriterOptions` for setting custom HTML rendering options
+- Added `html_writer_options()` method to `WriterOptionsBuilder` for builder pattern support
+
+#### HtmlWriter
+- Added `set_options()` method for updating writer options at runtime
+- Added `options()` and `options_mut()` methods for accessing current options
+- Added `with_modified_options()` method for creating writers with modified options using closures
+
+#### HtmlWriterOptions
+- Added `with_code_block_prefix()` and `set_code_block_prefix()` methods
+- Added `with_strict()` and `set_strict()` methods
+- Added `with_gfm_enabled()` and `set_gfm_enabled()` methods (GFM feature)
+- Added `with_gfm_disallowed_tags()` and `set_gfm_disallowed_tags()` methods (GFM feature)
+
+### Behavior Changes
+
+- **Default Behavior**: When `html_writer_options` is `None`, options are automatically derived from `CommonMarkWriter` options (backward compatible)
+- **Custom HTML Options**: When `html_writer_options` is `Some(options)`, the custom options are used directly for HTML element rendering
+- **Runtime Flexibility**: HtmlWriter options can now be modified during rendering for dynamic behavior
+
+### Usage Examples
+
+```rust
+// Custom HTML options in CommonMark writer
+let html_options = HtmlWriterOptions::default()
+    .with_strict(false)
+    .with_code_block_prefix(Some("highlight-"));
+
+let writer_options = WriterOptions::default()
+    .html_writer_options(Some(html_options));
+
+let mut writer = CommonMarkWriter::with_options(writer_options);
+
+// Runtime modification of HtmlWriter options
+let mut html_writer = HtmlWriter::new();
+html_writer.set_options(HtmlWriterOptions::default().with_strict(false));
+
+// Builder pattern with custom HTML options
+let options = WriterOptionsBuilder::new()
+    .html_writer_options(Some(
+        HtmlWriterOptions::default()
+            .with_strict(false)
+            .with_code_block_prefix(Some("lang-"))
+    ))
+    .build();
+```
+
+### Tests
+
+- Added comprehensive test suite for custom HTML options functionality
+- Tests cover default behavior, custom options, builder pattern, and runtime modifications
+- All tests pass ensuring backward compatibility and new feature correctness
+
 ## [0.7.8] - 2025-06-29
 
 ### Features

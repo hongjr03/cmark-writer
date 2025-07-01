@@ -76,6 +76,30 @@ impl HtmlWriter {
         }
     }
 
+    /// Updates the writer's options at runtime.
+    pub fn set_options(&mut self, options: HtmlWriterOptions) {
+        self.options = options;
+    }
+
+    /// Gets a reference to the current options.
+    pub fn options(&self) -> &HtmlWriterOptions {
+        &self.options
+    }
+
+    /// Gets a mutable reference to the current options.
+    pub fn options_mut(&mut self) -> &mut HtmlWriterOptions {
+        &mut self.options
+    }
+
+    /// Creates a new writer with modified options using a closure.
+    pub fn with_modified_options<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(&mut HtmlWriterOptions),
+    {
+        f(&mut self.options);
+        self
+    }
+
     /// Consumes the writer and returns the generated HTML string.
     pub fn into_string(mut self) -> EcoString {
         self.ensure_tag_closed().unwrap();

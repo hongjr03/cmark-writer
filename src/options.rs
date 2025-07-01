@@ -2,6 +2,7 @@
 //!
 //! This module provides configuration options for the CommonMark writer.
 
+use crate::writer::html::HtmlWriterOptions;
 #[cfg(feature = "gfm")]
 use ecow::EcoString;
 
@@ -50,6 +51,10 @@ pub struct WriterOptions {
     /// List of disallowed HTML tag names in GFM mode
     #[cfg(feature = "gfm")]
     pub gfm_disallowed_html_tags: Vec<EcoString>,
+
+    /// HTML writer options for rendering HtmlElement nodes
+    /// If None, options will be automatically derived from CommonMark options
+    pub html_writer_options: Option<HtmlWriterOptions>,
 }
 
 impl Default for WriterOptions {
@@ -92,7 +97,17 @@ impl Default for WriterOptions {
                 "script".into(),
                 "plaintext".into(),
             ],
+
+            html_writer_options: None,
         }
+    }
+}
+
+impl WriterOptions {
+    /// Set custom HTML writer options for rendering HtmlElement nodes
+    pub fn html_writer_options(mut self, options: Option<HtmlWriterOptions>) -> Self {
+        self.html_writer_options = options;
+        self
     }
 }
 
@@ -226,6 +241,12 @@ impl WriterOptionsBuilder {
     #[cfg(feature = "gfm")]
     pub fn gfm_disallowed_html_tags(mut self, tags: Vec<EcoString>) -> Self {
         self.options.gfm_disallowed_html_tags = tags;
+        self
+    }
+
+    /// Set custom HTML writer options for rendering HtmlElement nodes
+    pub fn html_writer_options(mut self, options: Option<HtmlWriterOptions>) -> Self {
+        self.options.html_writer_options = options;
         self
     }
 

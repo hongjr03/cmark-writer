@@ -8,7 +8,7 @@ pub use crate::ast::{CodeBlockType, HeadingType, HtmlAttribute, HtmlElement, Lis
 pub use crate::error::{CodedError, StructureError, WriteError, WriteResult};
 
 // Options
-pub use crate::options::WriterOptions;
+pub use crate::options::{WriterOptions, WriterOptionsBuilder};
 
 // CommonMark writer
 pub use crate::writer::CommonMarkWriter;

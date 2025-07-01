@@ -64,7 +64,7 @@ mod tests {
         render_node_to_html(
             node,
             #[cfg(feature = "gfm")]
-            &HtmlWriterOptions::default().enable_gfm(true),
+            &HtmlWriterOptions::default().with_gfm_enabled(true),
             #[cfg(not(feature = "gfm"))]
             &HtmlWriterOptions::default(),
         )

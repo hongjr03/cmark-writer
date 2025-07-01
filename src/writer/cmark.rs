@@ -912,16 +912,17 @@ impl CommonMarkWriter {
 
         use crate::writer::html::{HtmlWriter, HtmlWriterOptions};
 
-        // 从 CommonMarkWriter 的选项中派生 HTML 渲染选项
-        let html_options = HtmlWriterOptions {
-            // 使用相同的严格模式设置
-            strict: self.options.strict,
-            // 代码块语言类前缀，保持默认
-            code_block_language_class_prefix: Some("language-".into()),
-            #[cfg(feature = "gfm")]
-            enable_gfm: self.options.enable_gfm,
-            #[cfg(feature = "gfm")]
-            gfm_disallowed_html_tags: self.options.gfm_disallowed_html_tags.clone(),
+        let html_options = if let Some(ref custom_options) = self.options.html_writer_options {
+            custom_options.clone()
+        } else {
+            HtmlWriterOptions {
+                strict: self.options.strict,
+                code_block_language_class_prefix: Some("language-".into()),
+                #[cfg(feature = "gfm")]
+                enable_gfm: self.options.enable_gfm,
+                #[cfg(feature = "gfm")]
+                gfm_disallowed_html_tags: self.options.gfm_disallowed_html_tags.clone(),
+            }
         };
 
         let mut html_writer = HtmlWriter::with_options(html_options);
