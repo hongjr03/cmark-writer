@@ -7,20 +7,17 @@ use syn::{
 
 /// Parse custom_node attribute parameters
 struct CustomNodeArgs {
-    is_block: Option<bool>,
+    kind: Option<String>, // "block", "inline", "replaced", "void"
     html_impl: Option<bool>,
 }
 
 impl Parse for CustomNodeArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut is_block = None;
+        let mut kind = None;
         let mut html_impl = None;
 
         if input.is_empty() {
-            return Ok(CustomNodeArgs {
-                is_block,
-                html_impl,
-            });
+            return Ok(CustomNodeArgs { kind, html_impl });
         }
 
         loop {
@@ -30,10 +27,10 @@ impl Parse for CustomNodeArgs {
 
             let ident: Ident = input.parse()?;
 
-            if ident == "block" {
+            if ident == "kind" {
                 let _: Token![=] = input.parse()?;
-                let value: LitBool = input.parse()?;
-                is_block = Some(value.value);
+                let value: syn::LitStr = input.parse()?;
+                kind = Some(value.value());
             } else if ident == "html_impl" {
                 let _: Token![=] = input.parse()?;
                 let value: LitBool = input.parse()?;
@@ -41,7 +38,7 @@ impl Parse for CustomNodeArgs {
             } else {
                 return Err(syn::Error::new_spanned(
                     ident,
-                    "Unknown attribute parameter",
+                    "Unknown attribute parameter. Use 'kind' or 'html_impl'",
                 ));
             }
 
@@ -51,16 +48,14 @@ impl Parse for CustomNodeArgs {
             }
         }
 
-        Ok(CustomNodeArgs {
-            is_block,
-            html_impl,
-        })
+        Ok(CustomNodeArgs { kind, html_impl })
     }
 }
 
-/// Custom node attribute macro for implementing the CustomNode trait
+/// Custom node attribute macro for implementing the new CustomNode trait architecture
 ///
-/// This macro automatically implements the CustomNode trait. Users can specify
+/// This macro automatically implements the new CustomNode trait along with required
+/// base traits (NodeContent, NodeClone, CommonMarkRenderable). Users can specify
 /// whether the node is a block element using the `block` parameter and whether
 /// it implements HTML rendering with the `html_impl` parameter.
 ///
@@ -72,7 +67,7 @@ impl Parse for CustomNodeArgs {
 ///
 /// // Specified as an inline element with both CommonMark and HTML implementations
 /// #[derive(Debug, Clone, PartialEq)]
-/// #[custom_node(block=false, html_impl=true)]
+/// #[custom_node(kind="inline", html_impl=true)]
 /// struct HighlightNode {
 ///     content: EcoString,
 ///     color: EcoString,
@@ -102,7 +97,7 @@ impl Parse for CustomNodeArgs {
 ///
 /// // Only CommonMark implementation, default HTML implementation
 /// #[derive(Debug, Clone, PartialEq)]
-/// #[custom_node(block=true)]
+/// #[custom_node(kind="block")]
 /// struct AlertNode {
 ///     content: EcoString,
 /// }
@@ -122,11 +117,25 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
     let name = &input.ident;
 
-    // Configure is_block implementation
-    let is_block_impl = if let Some(is_block) = args.is_block {
+    // Configure is_block implementation based on NodeKind
+    let is_block_impl = if let Some(kind_str) = &args.kind {
+        let node_kind = match kind_str.as_str() {
+            "block" => quote! { ::cmark_writer::NodeKind::Block },
+            "inline" => quote! { ::cmark_writer::NodeKind::Inline },
+            "replaced" => quote! { ::cmark_writer::NodeKind::Replaced },
+            "void" => quote! { ::cmark_writer::NodeKind::Void },
+            _ => {
+                return syn::Error::new_spanned(
+                    name,
+                    "Invalid kind. Use 'block', 'inline', 'replaced', or 'void'",
+                )
+                .to_compile_error()
+                .into()
+            }
+        };
         quote! {
             fn is_block(&self) -> bool {
-                #is_block
+                #node_kind.is_block()
             }
         }
     } else {
@@ -137,29 +146,29 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    // Configure html_write implementation
-    let html_write_impl = if args.html_impl.unwrap_or(false) {
+    // Configure html_render implementation
+    let html_render_impl = if args.html_impl.unwrap_or(false) {
         // When html_impl=true, expect user to implement write_html_custom method
         quote! {
-            fn html_write(
+            fn html_render(
                 &self,
                 writer: &mut ::cmark_writer::writer::HtmlWriter,
-            ) -> ::cmark_writer::writer::HtmlWriteResult<()> {
-                self.write_html_custom(writer)
+            ) -> ::cmark_writer::error::WriteResult<()> {
+                self.write_html_custom(writer).map_err(::cmark_writer::error::WriteError::from)
             }
         }
     } else {
         // When html_impl is not set or false, use default implementation
         quote! {
-            fn html_write(
+            fn html_render(
                 &self,
                 writer: &mut ::cmark_writer::writer::HtmlWriter,
-            ) -> ::cmark_writer::writer::HtmlWriteResult<()> {
+            ) -> ::cmark_writer::error::WriteResult<()> {
+                use ::cmark_writer::traits::NodeContent;
                 writer.raw_html(&format!(
                     "<!-- HTML rendering not implemented for Custom Node: {} -->",
                     self.type_name()
-                ))?;
-                Ok(())
+                )).map_err(::cmark_writer::error::WriteError::from)
             }
         }
     };
@@ -167,29 +176,13 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #input
 
-        impl ::cmark_writer::ast::CustomNode for #name {
-            fn write(
-                &self,
-                writer: &mut ::cmark_writer::writer::CommonMarkWriter,
-            ) -> ::cmark_writer::error::WriteResult<()> {
-                self.write_custom(writer)
-            }
-
-            #html_write_impl
-
-            fn clone_box(&self) -> Box<dyn ::cmark_writer::ast::CustomNode> {
-                Box::new(self.clone())
-            }
-
-            fn eq_box(&self, other: &dyn ::cmark_writer::ast::CustomNode) -> bool {
-                if let Some(other) = other.as_any().downcast_ref::<Self>() {
-                    self == other
-                } else {
-                    false
-                }
-            }
-
+        // Implement NodeContent trait
+        impl ::cmark_writer::traits::NodeContent for #name {
             #is_block_impl
+
+            fn type_name(&self) -> &'static str {
+                std::any::type_name::<Self>()
+            }
 
             fn as_any(&self) -> &dyn std::any::Any {
                 self
@@ -200,13 +193,53 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
+        // Implement NodeClone trait
+        impl ::cmark_writer::traits::NodeClone for #name {
+            fn clone_box(&self) -> Box<dyn ::cmark_writer::traits::NodeContent> {
+                Box::new(self.clone())
+            }
+
+            fn eq_box(&self, other: &dyn ::cmark_writer::traits::NodeContent) -> bool {
+                if let Some(other) = other.as_any().downcast_ref::<Self>() {
+                    self == other
+                } else {
+                    false
+                }
+            }
+        }
+
+        // Implement CommonMarkRenderable trait
+        impl ::cmark_writer::traits::CommonMarkRenderable for #name {
+            fn render_commonmark(
+                &self,
+                writer: &mut ::cmark_writer::writer::CommonMarkWriter,
+            ) -> ::cmark_writer::error::WriteResult<()> {
+                self.write_custom(writer)
+            }
+        }
+
+        // Implement CustomNode trait
+        impl ::cmark_writer::traits::CustomNode for #name {
+            #html_render_impl
+
+            fn supports_capability(&self, capability: &str) -> bool {
+                match capability {
+                    "commonmark" => true,
+                    "html" => true, // Always true for macro-generated nodes
+                    _ => false,
+                }
+            }
+        }
+
         impl #name {
-            pub fn matches(node: &dyn ::cmark_writer::ast::CustomNode) -> bool {
+            pub fn matches(node: &dyn ::cmark_writer::traits::CustomNode) -> bool {
+                use ::cmark_writer::traits::NodeContent;
                 node.type_name() == std::any::type_name::<#name>() ||
                     node.as_any().downcast_ref::<#name>().is_some()
             }
 
-            pub fn extract(node: Box<dyn ::cmark_writer::ast::CustomNode>) -> Option<#name> {
+            pub fn extract(node: Box<dyn ::cmark_writer::traits::CustomNode>) -> Option<#name> {
+                use ::cmark_writer::traits::NodeContent;
                 node.as_any().downcast_ref::<#name>().map(|n| n.clone())
             }
         }

@@ -2,14 +2,13 @@
 //!
 //! This file contains the implementation of the CommonMarkWriter class, which serializes AST nodes to CommonMark-compliant text.
 
-use super::processors::{
-    BlockNodeProcessor, CustomNodeProcessor, InlineNodeProcessor, NodeProcessor,
-};
+use super::processors::CustomNodeProcessor;
 #[cfg(feature = "gfm")]
 use crate::ast::TableAlignment;
 use crate::ast::{CodeBlockType, CustomNode, HeadingType, ListItem, Node};
 use crate::error::{WriteError, WriteResult};
 use crate::options::WriterOptions;
+use crate::traits::NodeProcessor;
 use ecow::EcoString;
 use log;
 use std::fmt::{self};
@@ -134,23 +133,166 @@ impl CommonMarkWriter {
     /// ```
     pub fn write(&mut self, node: &Node) -> WriteResult<()> {
         if let Node::Custom(_) = node {
-            return CustomNodeProcessor.process(self, node);
+            let processor = CustomNodeProcessor;
+            return processor.process_commonmark(self, node);
         }
 
-        if node.is_block() {
-            BlockNodeProcessor.process(self, node)
-        } else if node.is_inline() {
-            InlineNodeProcessor.process(self, node)
-        } else {
-            log::warn!("Unsupported node type encountered and skipped: {:?}", node);
-            Ok(())
+        // 直接匹配节点类型
+        match node {
+            Node::Document(children) => self.write_document_children(children),
+            _ => {
+                // 对于其他节点类型，使用现有的方法
+                self.write_node_internal(node)?;
+
+                // 确保块级元素后有换行符
+                if node.is_block() {
+                    self.ensure_trailing_newline()?;
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    /// 写入文档的子节点，精确控制间距
+    fn write_document_children(&mut self, children: &[Node]) -> WriteResult<()> {
+        for (i, child) in children.iter().enumerate() {
+            if i > 0 {
+                // 检查是否需要分隔符
+                let prev_child = &children[i - 1];
+                if prev_child.is_block() && child.is_block() {
+                    // 对于文档级别的块级元素，我们直接添加两个换行符
+                    // 但不依赖ensure_trailing_newline，避免重复
+                    self.write_str("\n\n")?;
+                }
+            }
+
+            // 对于文档中的子节点，我们需要写入但不自动添加尾部换行符
+            // 因为文档级别会管理间距
+            self.write_node_without_trailing_newline(child)?;
+        }
+
+        // 确保文档结尾有换行符（如果最后一个元素是块级的话）
+        if let Some(last_child) = children.last() {
+            if last_child.is_block() {
+                self.ensure_trailing_newline()?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 写入节点但不自动添加尾部换行符
+    fn write_node_without_trailing_newline(&mut self, node: &Node) -> WriteResult<()> {
+        match node {
+            Node::Heading {
+                level,
+                content,
+                heading_type,
+            } => self.write_heading_without_newline(*level, content, heading_type),
+            Node::Paragraph(content) => self.write_paragraph_without_newline(content),
+            Node::Custom(custom_node) => {
+                // 直接调用 custom node 的 render 方法，不添加尾部换行符
+                custom_node.render_commonmark(self)
+            }
+            _ => self.write_node_internal(node),
+        }
+    }
+
+    /// 内部节点写入方法
+    fn write_node_internal(&mut self, node: &Node) -> WriteResult<()> {
+        // 在严格模式下检查内联元素中的换行符
+        if self.options.strict
+            && !node.is_block()
+            && !matches!(node, Node::SoftBreak | Node::HardBreak)
+        {
+            match node {
+                Node::Text(content) => {
+                    if content.contains('\n') {
+                        return Err(WriteError::NewlineInInlineElement("Text".into()));
+                    }
+                }
+                Node::InlineCode(content) => {
+                    if content.contains('\n') {
+                        return Err(WriteError::NewlineInInlineElement("InlineCode".into()));
+                    }
+                }
+                Node::Emphasis(children) | Node::Strong(children) => {
+                    for child in children {
+                        if let Node::Text(content) = child {
+                            if content.contains('\n') {
+                                return Err(WriteError::NewlineInInlineElement(
+                                    "Text in formatting".into(),
+                                ));
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        match node {
+            Node::Heading {
+                level,
+                content,
+                heading_type,
+            } => self.write_heading(*level, content, heading_type),
+            Node::Paragraph(content) => self.write_paragraph(content),
+            Node::BlockQuote(content) => self.write_blockquote(content),
+            Node::CodeBlock {
+                language,
+                content,
+                block_type,
+            } => self.write_code_block(language, content, block_type),
+            Node::UnorderedList(items) => self.write_unordered_list(items),
+            Node::OrderedList { start, items } => self.write_ordered_list(*start, items),
+            Node::ThematicBreak => self.write_thematic_break(),
+            Node::Text(content) => self.write_text_content(content),
+            Node::Emphasis(content) => self.write_emphasis(content),
+            Node::Strong(content) => self.write_strong(content),
+            Node::InlineCode(content) => self.write_code_content(content),
+            Node::Link {
+                url,
+                title,
+                content,
+            } => self.write_link(url, title, content),
+            Node::Image { url, title, alt } => self.write_image(url, title, alt),
+            Node::SoftBreak => self.write_soft_break(),
+            Node::HardBreak => self.write_hard_break(),
+            Node::HtmlBlock(content) => self.write_html_block(content),
+            Node::HtmlElement(element) => self.write_html_element(element),
+            Node::Autolink { url, is_email } => self.write_autolink(url, *is_email),
+            Node::ReferenceLink { label, content } => self.write_reference_link(label, content),
+            Node::LinkReferenceDefinition {
+                label,
+                destination,
+                title,
+            } => self.write_link_reference_definition(label, destination, title),
+            #[cfg(feature = "gfm")]
+            Node::Table {
+                headers,
+                alignments,
+                rows,
+            } => self.write_table_with_alignment(headers, alignments, rows),
+            #[cfg(not(feature = "gfm"))]
+            Node::Table { headers, rows, .. } => self.write_table(headers, rows),
+            #[cfg(feature = "gfm")]
+            Node::Strikethrough(content) => self.write_strikethrough(content),
+            #[cfg(feature = "gfm")]
+            Node::ExtendedAutolink(url) => self.write_extended_autolink(url),
+            Node::Custom(custom_node) => self.write_custom_node(custom_node),
+            _ => {
+                log::warn!("Unsupported node type encountered and skipped: {:?}", node);
+                Ok(())
+            }
         }
     }
 
     /// Write a custom node using its implementation
     #[allow(clippy::borrowed_box)]
     pub(crate) fn write_custom_node(&mut self, node: &Box<dyn CustomNode>) -> WriteResult<()> {
-        node.write(self)
+        node.render_commonmark(self)
     }
 
     /// Get context description for a node, used for error reporting
@@ -323,6 +465,83 @@ impl CommonMarkWriter {
             }
         }
 
+        Ok(())
+    }
+
+    /// Write a heading node without trailing newline (for document context)
+    fn write_heading_without_newline(
+        &mut self,
+        mut level: u8,
+        content: &[Node],
+        heading_type: &HeadingType,
+    ) -> WriteResult<()> {
+        // 验证标题级别
+        if level == 0 || level > 6 {
+            if self.is_strict_mode() {
+                return Err(WriteError::InvalidHeadingLevel(level));
+            } else {
+                let original_level = level;
+                level = level.clamp(1, 6); // Clamp level to 1-6
+                log::warn!(
+                    "Invalid heading level: {}. Corrected to {}. Strict mode is off.",
+                    original_level,
+                    level
+                );
+            }
+        }
+        match heading_type {
+            // ATX heading, using # character
+            HeadingType::Atx => {
+                for _ in 0..level {
+                    self.write_char('#')?;
+                }
+                self.write_char(' ')?;
+                for node in content {
+                    self.write(node)?;
+                }
+                // 不添加尾部换行符
+            }
+            HeadingType::Setext => {
+                // First write the heading content
+                for node in content {
+                    self.write(node)?;
+                }
+                self.write_char('\n')?;
+                // Add underline characters based on level
+                // Setext only supports level 1 and 2 headings
+                let underline_char = if level == 1 { '=' } else { '-' };
+                // For good readability, we add underlines at least as long as the heading text
+                // Calculate a reasonable underline length (at least 3 characters)
+                let min_len = 3;
+                // Write the underline characters
+                for _ in 0..min_len {
+                    self.write_char(underline_char)?;
+                }
+                // 不添加尾部换行符
+            }
+        }
+        Ok(())
+    }
+
+    /// Write a paragraph node without trailing newline (for document context)
+    fn write_paragraph_without_newline(&mut self, content: &[Node]) -> WriteResult<()> {
+        if self.options.trim_paragraph_trailing_hard_breaks {
+            let mut last_non_hard_break_index = content.len();
+            while last_non_hard_break_index > 0 {
+                if !matches!(content[last_non_hard_break_index - 1], Node::HardBreak) {
+                    break;
+                }
+                last_non_hard_break_index -= 1;
+            }
+            for node in content.iter().take(last_non_hard_break_index) {
+                self.write(node)?;
+            }
+        } else {
+            for node in content {
+                self.write(node)?;
+            }
+        }
+        // 不添加尾部换行符
         Ok(())
     }
 
@@ -686,7 +905,7 @@ impl CommonMarkWriter {
         content: &[Node],
     ) -> WriteResult<()> {
         for node in content {
-            self.check_no_newline(node, "Link Text")?;
+            self.check_no_newline(node, "Link content")?;
         }
         self.write_char('[')?;
 

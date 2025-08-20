@@ -8,9 +8,10 @@ mod html;
 mod node;
 pub mod tables;
 
-pub use self::custom::CustomNode;
+pub use self::custom::{GenericCustomNode, NodeKind, TextCustomNode};
 pub use self::html::{HtmlAttribute, HtmlElement};
 pub use self::node::{CodeBlockType, HeadingType, ListItem, Node};
+pub use crate::traits::CustomNode;
 
 // Re-export GFM specific types when the GFM feature is enabled
 #[cfg(feature = "gfm")]

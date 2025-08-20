@@ -12,7 +12,7 @@ use log;
 /// - Directly with individual nodes through methods like `write_node`
 /// - For building HTML elements programmatically using the tag and attribute methods
 /// - As part of the CommonMarkWriter's HTML rendering process
-/// - In custom node implementations via the `html_impl=true` attribute
+/// - 在自定义节点实现中直接调用 HtmlWriter API
 ///
 /// # Examples
 ///
@@ -297,8 +297,13 @@ impl HtmlWriter {
                 self.write_reference_link_node(label, content)
             }
             Node::Custom(custom_node) => {
-                // Call the CustomNode's html_write method, which handles the HTML rendering
-                custom_node.html_write(self)
+                // Call the CustomNode's html_render method, which handles the HTML rendering
+                custom_node.html_render(self).map_err(|e| match e {
+                    crate::error::WriteError::HtmlRenderingError(html_err) => html_err,
+                    other => {
+                        crate::writer::html::HtmlWriteError::CustomNodeError(other.to_string())
+                    }
+                })
             }
             // Fallback for node types not handled, especially if GFM is off and GFM nodes appear
             #[cfg(not(feature = "gfm"))]

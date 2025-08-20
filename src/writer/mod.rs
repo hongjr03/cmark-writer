@@ -3,7 +3,7 @@
 //! This module provides functionality to convert AST nodes to various formats.
 
 mod cmark;
-mod processors;
+pub mod processors;
 
 pub use self::cmark::CommonMarkWriter;
 

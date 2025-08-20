@@ -56,7 +56,7 @@ use cmark_writer::ast::{Node, tables::TableBuilder};
 // Create tables with the builder pattern
 let table = TableBuilder::new()
     .headers(vec![
-        Node::Text("Name".into()), 
+        Node::Text("Name".into()),
         Node::Text("Age".into())
     ])
     .add_row(vec![
@@ -117,22 +117,23 @@ assert_eq!(html, "<p>Hello HTML</p>\n");
 
 ## Custom Nodes
 
+The recommended way to build custom nodes is via standard Rust traits. Implement Format for each writer you want to support, and optionally MultiFormat for capability checks and HTML fallback.
+
 ```rust
-use cmark_writer::{CommonMarkWriter, HtmlWriter, HtmlWriteResult, Node};
-use cmark_writer::WriteResult;
-use cmark_writer::custom_node;
+use cmark_writer::{Format, ToCommonMark, ToHtml, MultiFormat};
+use cmark_writer::{CommonMarkWriter, HtmlWriter, WriteResult};
+use cmark_writer::format_traits::default_html_render;
 use ecow::EcoString;
 
+// Inline custom node with CommonMark + HTML implementations
 #[derive(Debug, Clone, PartialEq)]
-#[custom_node(block=false, html_impl=true)]
-struct HighlightNode {
+pub struct HighlightNode {
     content: EcoString,
     color: EcoString,
 }
 
-impl HighlightNode {
-    // Implementation for CommonMark output
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+impl Format<CommonMarkWriter> for HighlightNode {
+    fn format(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         writer.write_str("<span style=\"background-color: ")?;
         writer.write_str(&self.color)?;
         writer.write_str("\">")?;
@@ -140,9 +141,10 @@ impl HighlightNode {
         writer.write_str("</span>")?;
         Ok(())
     }
-    
-    // Optional HTML-specific implementation
-    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+}
+
+impl Format<HtmlWriter> for HighlightNode {
+    fn format(&self, writer: &mut HtmlWriter) -> WriteResult<()> {
         writer.start_tag("span")?;
         writer.attribute("style", &format!("background-color: {}", self.color))?;
         writer.finish_tag()?;
@@ -151,7 +153,76 @@ impl HighlightNode {
         Ok(())
     }
 }
+
+impl MultiFormat for HighlightNode {
+    fn supports_html(&self) -> bool { true }
+    fn html_format(&self, writer: &mut HtmlWriter) -> WriteResult<()> { self.to_html(writer) }
+}
+
+// Block-level custom node example
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalloutBox {
+    title: EcoString,
+    content: EcoString,
+}
+
+impl Format<CommonMarkWriter> for CalloutBox {
+    fn format(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        writer.write_str("<div class=\"callout\">\n  <h4>")?;
+        writer.write_str(&self.title)?;
+        writer.write_str("</h4>\n  <p>")?;
+        writer.write_str(&self.content)?;
+        writer.write_str("</p>\n</div>")?;
+        Ok(())
+    }
+}
+
+impl Format<HtmlWriter> for CalloutBox {
+    fn format(&self, writer: &mut HtmlWriter) -> WriteResult<()> {
+        writer.start_tag("div")?; writer.finish_tag()?;
+        writer.start_tag("h4")?; writer.finish_tag()?; writer.text(&self.title)?; writer.end_tag("h4")?;
+        writer.start_tag("p")?;  writer.finish_tag()?; writer.text(&self.content)?; writer.end_tag("p")?;
+        writer.end_tag("div")?;
+        Ok(())
+    }
+}
+
+impl MultiFormat for CalloutBox {
+    fn supports_html(&self) -> bool { true }
+    fn html_format(&self, writer: &mut HtmlWriter) -> WriteResult<()> { self.to_html(writer) }
+}
+
+// Only CommonMark support with graceful HTML fallback
+#[derive(Debug, Clone, PartialEq)]
+pub struct SimpleNote { content: EcoString }
+
+impl Format<CommonMarkWriter> for SimpleNote {
+    fn format(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        writer.write_str("> **Note:** ")?;
+        writer.write_str(&self.content)?;
+        Ok(())
+    }
+}
+
+impl MultiFormat for SimpleNote {
+    fn supports_html(&self) -> bool { false }
+    fn html_format(&self, writer: &mut HtmlWriter) -> WriteResult<()> { default_html_render(self, writer) }
+}
+
+// Usage
+let highlight = HighlightNode { content: "important".into(), color: "yellow".into() };
+let mut md = CommonMarkWriter::new();
+let mut html = HtmlWriter::new();
+highlight.to_commonmark(&mut md).unwrap();
+highlight.to_html(&mut html).unwrap();
+assert!(highlight.supports_html());
 ```
+
+This approach provides:
+
+- Type safety and clear format boundaries
+- Easy extensibility for new formats
+- Consistent, idiomatic Rust traits across the API
 
 ## Development
 

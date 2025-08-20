@@ -1,7 +1,7 @@
 //! Node definitions for the CommonMark AST.
 
-use super::custom::CustomNode;
 use super::html::HtmlElement;
+use crate::traits::CustomNode;
 use ecow::EcoString;
 use std::boxed::Box;
 
