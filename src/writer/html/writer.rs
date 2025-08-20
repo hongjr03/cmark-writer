@@ -12,7 +12,7 @@ use log;
 /// - Directly with individual nodes through methods like `write_node`
 /// - For building HTML elements programmatically using the tag and attribute methods
 /// - As part of the CommonMarkWriter's HTML rendering process
-/// - 在自定义节点实现中直接调用 HtmlWriter API
+/// - 在自定义节点实现中直接调用 HtmlWriter API（已不再推荐使用 `html_impl` 属性）
 ///
 /// # Examples
 ///
