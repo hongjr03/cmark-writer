@@ -9,14 +9,26 @@ pub use crate::error::{CodedError, StructureError, WriteError, WriteResult};
 
 // Unified trait architecture
 pub use crate::traits::{
-    // Core traits
-    CustomNode, NodeClone, NodeContent, Writer,
-    // Formatting traits
-    CommonMarkRenderable, Format, HtmlRenderable, MultiFormat, ToCommonMark, ToHtml,
     // Processing traits
-    BlockNodeProcessor, ConfigurableProcessor, InlineNodeProcessor, NodeProcessor,
+    BlockNodeProcessor,
+    // Formatting traits
+    CommonMarkRenderable,
+    ConfigurableProcessor,
+    // Core traits
+    CustomNode,
     // Utility traits
-    ErrorContext, ErrorFactory,
+    ErrorContext,
+    ErrorFactory,
+    Format,
+    HtmlRenderable,
+    InlineNodeProcessor,
+    MultiFormat,
+    NodeClone,
+    NodeContent,
+    NodeProcessor,
+    ToCommonMark,
+    ToHtml,
+    Writer,
 };
 
 // New processors

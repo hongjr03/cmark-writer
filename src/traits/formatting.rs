@@ -114,7 +114,7 @@ pub trait MultiFormat: ToCommonMark {
         W: 'static,
     {
         let type_id = std::any::TypeId::of::<W>();
-        
+
         if type_id == std::any::TypeId::of::<CommonMarkWriter>() {
             // Safety: We just checked the type
             let writer = unsafe { &mut *(writer as *mut W as *mut CommonMarkWriter) };
@@ -126,13 +126,11 @@ pub trait MultiFormat: ToCommonMark {
                 self.html_format(writer)
             } else {
                 Err(crate::error::WriteError::custom(
-                    "HTML format not supported for this node type"
+                    "HTML format not supported for this node type",
                 ))
             }
         } else {
-            Err(crate::error::WriteError::custom(
-                "Unsupported writer type"
-            ))
+            Err(crate::error::WriteError::custom("Unsupported writer type"))
         }
     }
 }
