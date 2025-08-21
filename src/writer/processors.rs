@@ -133,7 +133,8 @@ impl NodeProcessor for EnhancedBlockProcessor {
                 title,
             } => writer.write_link_reference_definition(label, destination, title),
             Node::Custom(custom_node) if custom_node.is_block() => {
-                custom_node.render_commonmark(writer)
+                // Ensure custom_node implements CommonMarkRenderable
+                CommonMarkRenderable::render_commonmark(custom_node, writer)
             }
             _ => Err(WriteError::UnsupportedNodeType),
         }?;
