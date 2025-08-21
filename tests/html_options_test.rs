@@ -1,6 +1,6 @@
 use cmark_writer::{
     CommonMarkWriter, HtmlAttribute, HtmlElement, HtmlWriter, HtmlWriterOptions, Node,
-    WriterOptions,
+    ToCommonMark, ToHtml, WriterOptions,
 };
 
 #[test]
@@ -26,8 +26,8 @@ fn test_derived_html_options() {
     };
 
     // 使用 CommonMarkWriter 写入 HTML 元素
-    cmark_writer
-        .write(&Node::HtmlElement(html_element))
+    Node::HtmlElement(html_element)
+        .to_commonmark(&mut cmark_writer)
         .unwrap();
     let output = cmark_writer.into_string();
 
@@ -58,12 +58,12 @@ fn test_html_options_strict_mode() {
 
     // 严格模式下应该生成错误
     let mut strict_writer = HtmlWriter::with_options(options_strict);
-    let strict_result = strict_writer.write_node(&Node::HtmlElement(invalid_tag_element.clone()));
+    let strict_result = Node::HtmlElement(invalid_tag_element.clone()).to_html(&mut strict_writer);
     assert!(strict_result.is_err());
 
     // 非严格模式下应该进行文本化处理
     let mut lenient_writer = HtmlWriter::with_options(options_lenient);
-    let lenient_result = lenient_writer.write_node(&Node::HtmlElement(invalid_tag_element));
+    let lenient_result = Node::HtmlElement(invalid_tag_element).to_html(&mut lenient_writer);
     assert!(lenient_result.is_ok());
 
     let output = lenient_writer.into_string();
@@ -93,7 +93,7 @@ fn test_code_block_language_class() {
 
     // 使用前缀
     let mut writer_with_prefix = HtmlWriter::with_options(options_with_prefix);
-    writer_with_prefix.write_node(&code_block).unwrap();
+    code_block.to_html(&mut writer_with_prefix).unwrap();
     let output_with_prefix = writer_with_prefix.into_string();
 
     // 验证输出包含预期的类前缀
@@ -101,7 +101,7 @@ fn test_code_block_language_class() {
 
     // 不使用前缀
     let mut writer_without_prefix = HtmlWriter::with_options(options_without_prefix);
-    writer_without_prefix.write_node(&code_block).unwrap();
+    code_block.to_html(&mut writer_without_prefix).unwrap();
     let output_without_prefix = writer_without_prefix.into_string();
 
     // 验证输出不包含类属性
@@ -127,8 +127,8 @@ fn test_gfm_html_filtering() {
     };
 
     let mut writer = HtmlWriter::with_options(options);
-    writer
-        .write_node(&Node::HtmlElement(script_element))
+    Node::HtmlElement(script_element)
+        .to_html(&mut writer)
         .unwrap();
     let output = writer.into_string();
 
@@ -164,8 +164,8 @@ fn test_nested_html_structures() {
         self_closing: false,
     };
 
-    writer
-        .write_node(&Node::HtmlElement(nested_element))
+    Node::HtmlElement(nested_element)
+        .to_html(&mut writer)
         .unwrap();
     let output = writer.into_string();
 

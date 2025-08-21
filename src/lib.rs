@@ -7,6 +7,36 @@ pub use crate::ast::{CodeBlockType, HeadingType, HtmlAttribute, HtmlElement, Lis
 // Error types
 pub use crate::error::{CodedError, StructureError, WriteError, WriteResult};
 
+// Unified trait architecture
+pub use crate::traits::{
+    // Processing traits
+    BlockNodeProcessor,
+    // Formatting traits
+    CommonMarkRenderable,
+    ConfigurableProcessor,
+    // Core traits
+    CustomNode,
+    // Utility traits
+    ErrorContext,
+    ErrorFactory,
+    Format,
+    HtmlRenderable,
+    InlineNodeProcessor,
+    MultiFormat,
+    NodeClone,
+    NodeContent,
+    NodeProcessor,
+    ToCommonMark,
+    ToHtml,
+    Writer,
+};
+
+// New processors
+pub use crate::writer::processors::{
+    BlockProcessorConfig, CustomNodeProcessor, EnhancedBlockProcessor, EnhancedInlineProcessor,
+    InlineProcessorConfig,
+};
+
 // Options
 pub use crate::options::{WriterOptions, WriterOptionsBuilder};
 
@@ -16,12 +46,13 @@ pub use crate::writer::CommonMarkWriter;
 // HTML writer related exports
 pub use crate::writer::{HtmlWriteError, HtmlWriteResult, HtmlWriter, HtmlWriterOptions};
 
-// Export proc-macro attributes
-pub use cmark_writer_macros::{coded_error, custom_node, structure_error};
+// Export proc-macro attributes and derive macros
+pub use cmark_writer_macros::{coded_error, structure_error, CommonMarkOnly};
 
 pub mod ast;
 pub mod error;
 pub mod options;
+pub mod traits;
 pub mod writer;
 
 /// GitHub Flavored Markdown (GFM) extensions

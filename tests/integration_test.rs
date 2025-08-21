@@ -1,5 +1,6 @@
 use cmark_writer::ast::{CodeBlockType, HeadingType, ListItem, Node};
 use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::ToCommonMark;
 
 #[test]
 fn test_simple_document() {
@@ -22,8 +23,8 @@ fn test_simple_document() {
 
     // Write as CommonMark
     let mut writer = CommonMarkWriter::new();
-    writer
-        .write(&node_document)
+    node_document
+        .to_commonmark(&mut writer)
         .expect("Failed to write document");
     let result = writer.into_string();
 
@@ -59,8 +60,8 @@ fn test_complex_document() {
     let node_document = document;
 
     let mut writer = CommonMarkWriter::new();
-    writer
-        .write(&node_document)
+    node_document
+        .to_commonmark(&mut writer)
         .expect("Failed to write document");
     let result = writer.into_string();
 

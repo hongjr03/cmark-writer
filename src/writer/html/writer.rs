@@ -12,18 +12,18 @@ use log;
 /// - Directly with individual nodes through methods like `write_node`
 /// - For building HTML elements programmatically using the tag and attribute methods
 /// - As part of the CommonMarkWriter's HTML rendering process
-/// - In custom node implementations via the `html_impl=true` attribute
+/// - Calling HtmlWriter API directly in custom node implementations (use of `html_impl` attribute is no longer recommended)
 ///
 /// # Examples
 ///
 /// ## Basic usage
 ///
 /// ```rust
-/// use cmark_writer::{HtmlWriter, Node};
+/// use cmark_writer::{HtmlWriter, Node, ToHtml};
 ///
 /// let mut writer = HtmlWriter::new();
 /// let para = Node::Paragraph(vec![Node::Text("Hello, world!".into())]);
-/// writer.write_node(&para).unwrap();
+/// para.to_html(&mut writer).unwrap();
 ///
 /// let output = writer.into_string();
 /// assert_eq!(output, "<p>Hello, world!</p>\n");
@@ -250,7 +250,7 @@ impl HtmlWriter {
     // --- Main Node Dispatcher ---
 
     /// Writes an AST `Node` to HTML using the configured options.
-    pub fn write_node(&mut self, node: &Node) -> HtmlWriteResult<()> {
+    pub(crate) fn write_node_internal(&mut self, node: &Node) -> HtmlWriteResult<()> {
         match node {
             Node::Document(children) => self.write_document_node(children),
             Node::Paragraph(children) => self.write_paragraph_node(children),
@@ -297,8 +297,13 @@ impl HtmlWriter {
                 self.write_reference_link_node(label, content)
             }
             Node::Custom(custom_node) => {
-                // Call the CustomNode's html_write method, which handles the HTML rendering
-                custom_node.html_write(self)
+                // Call the CustomNode's html_render method, which handles the HTML rendering
+                custom_node.html_render(self).map_err(|e| match e {
+                    crate::error::WriteError::HtmlRenderingError(html_err) => html_err,
+                    other => {
+                        crate::writer::html::HtmlWriteError::CustomNodeError(other.to_string())
+                    }
+                })
             }
             // Fallback for node types not handled, especially if GFM is off and GFM nodes appear
             #[cfg(not(feature = "gfm"))]
@@ -317,7 +322,7 @@ impl HtmlWriter {
 
     fn write_document_node(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
         for child in children {
-            self.write_node(child)?;
+            self.write_node_internal(child)?;
             // Optionally add newlines between major block elements in HTML source
             if child.is_block() && !self.buffer.ends_with('\n') {
                 // self.raw_html_internal("\n")?;
@@ -330,7 +335,7 @@ impl HtmlWriter {
         self.start_tag_internal("p")?;
         self.finish_tag_internal()?;
         for child in children {
-            self.write_node(child)?;
+            self.write_node_internal(child)?;
         }
         self.end_tag_internal("p")?;
         self.raw_html_internal("\n")?;
@@ -346,7 +351,7 @@ impl HtmlWriter {
         self.start_tag_internal(&tag_name)?;
         self.finish_tag_internal()?;
         for child in content {
-            self.write_node(child)?;
+            self.write_node_internal(child)?;
         }
         self.end_tag_internal(&tag_name)?;
         self.raw_html_internal("\n")?;
@@ -357,7 +362,7 @@ impl HtmlWriter {
         self.start_tag_internal("em")?;
         self.finish_tag_internal()?;
         for child in children {
-            self.write_node(child)?;
+            self.write_node_internal(child)?;
         }
         self.end_tag_internal("em")?;
         Ok(())
@@ -367,7 +372,7 @@ impl HtmlWriter {
         self.start_tag_internal("strong")?;
         self.finish_tag_internal()?;
         for child in children {
-            self.write_node(child)?;
+            self.write_node_internal(child)?;
         }
         self.end_tag_internal("strong")?;
         Ok(())
@@ -470,7 +475,7 @@ impl HtmlWriter {
         } else {
             self.finish_tag_internal()?;
             for child in &element.children {
-                self.write_node(child)?;
+                self.write_node_internal(child)?;
             }
             self.end_tag_internal(&element.tag)?;
         }
@@ -496,7 +501,7 @@ impl HtmlWriter {
         } else {
             self.text_internal(">")?;
             for child in &element.children {
-                self.write_node(child)?; // Children are rendered normally
+                self.write_node_internal(child)?; // Children are rendered normally
             }
             self.text_internal("</")?;
             self.text_internal(&element.tag)?;
@@ -532,7 +537,7 @@ impl HtmlWriter {
         }
         self.finish_tag_internal()?;
         for child in content {
-            self.write_node(child)?;
+            self.write_node_internal(child)?;
         }
         self.end_tag_internal("a")?;
         Ok(())
@@ -563,7 +568,7 @@ impl HtmlWriter {
         self.finish_tag_internal()?;
         self.raw_html_internal("\n")?;
         for child in children {
-            self.write_node(child)?;
+            self.write_node_internal(child)?;
         }
         self.end_tag_internal("blockquote")?;
         self.raw_html_internal("\n")?;
@@ -582,7 +587,7 @@ impl HtmlWriter {
                 self.raw_html_internal("\n")?;
                 add_newline_before_next_child = false;
             }
-            self.write_node(child_node)?;
+            self.write_node_internal(child_node)?;
             if child_node.is_block() {
                 add_newline_before_next_child = true;
             }
@@ -667,14 +672,14 @@ impl HtmlWriter {
             // render content as is. This case should ideally be guarded by options check.
             log::warn!("Strikethrough node encountered but GFM (or GFM strikethrough) is not enabled. Rendering content as plain.");
             for child in children {
-                self.write_node(child)?;
+                self.write_node_internal(child)?;
             }
             return Ok(());
         }
         self.start_tag_internal("del")?;
         self.finish_tag_internal()?;
         for child in children {
-            self.write_node(child)?;
+            self.write_node_internal(child)?;
         }
         self.end_tag_internal("del")?;
         Ok(())
@@ -720,7 +725,7 @@ impl HtmlWriter {
             }
 
             self.finish_tag_internal()?;
-            self.write_node(header_cell)?;
+            self.write_node_internal(header_cell)?;
             self.end_tag_internal("th")?;
             self.raw_html_internal("\n")?;
         }
@@ -729,7 +734,7 @@ impl HtmlWriter {
         for header_cell in headers.iter() {
             self.start_tag_internal("th")?;
             self.finish_tag_internal()?;
-            self.write_node(header_cell)?;
+            self.write_node_internal(header_cell)?;
             self.end_tag_internal("th")?;
             self.raw_html_internal("\n")?;
         }
@@ -771,7 +776,7 @@ impl HtmlWriter {
                 }
 
                 self.finish_tag_internal()?;
-                self.write_node(cell)?;
+                self.write_node_internal(cell)?;
                 self.end_tag_internal("td")?;
                 self.raw_html_internal("\n")?;
             }
@@ -781,7 +786,7 @@ impl HtmlWriter {
             for cell in row_cells.iter() {
                 self.start_tag_internal("td")?;
                 self.finish_tag_internal()?;
-                self.write_node(cell)?;
+                self.write_node_internal(cell)?;
                 self.end_tag_internal("td")?;
                 self.raw_html_internal("\n")?;
             }
@@ -854,7 +859,7 @@ impl HtmlWriter {
             // In this case, `content` is rendered as its textual representation inside the first brackets
             // This might mean rendering resolved inline nodes within `content` as text.
             for node_in_content in content {
-                self.write_node(node_in_content)?; // This will render HTML if content has e.g. <em>
+                self.write_node_internal(node_in_content)?; // This will render HTML if content has e.g. <em>
             }
         }
         self.text_internal("]")?; // Closing first bracket set
@@ -935,10 +940,3 @@ fn render_nodes_to_plain_text_string(nodes: &[Node], options: &HtmlWriterOptions
     render_nodes_to_plain_text(nodes, &mut s, options);
     s
 }
-
-// Example of how CustomNode's html_write might be expected by the HtmlWriter:
-// (This would be part of the CustomNode trait definition and its implementations)
-// pub trait CustomNode {
-//     // ... other methods ...
-//     fn html_write(&self, options: &HtmlRenderOptions) -> Result<EcoString, EcoString>; // EcoString for error msg
-// }

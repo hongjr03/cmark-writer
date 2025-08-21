@@ -13,6 +13,7 @@ A CommonMark writer implementation in Rust.
 ```rust
 use cmark_writer::ast::{Node, ListItem};
 use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::traits::ToCommonMark;
 
 // Create a document
 let document = Node::Document(vec![
@@ -26,7 +27,7 @@ let document = Node::Document(vec![
 
 // Render to CommonMark
 let mut writer = CommonMarkWriter::new();
-writer.write(&document).expect("Failed to write document");
+document.to_commonmark(&mut writer).expect("Failed to write document");
 let markdown = writer.into_string();
 
 println!("{}", markdown);
@@ -56,7 +57,7 @@ use cmark_writer::ast::{Node, tables::TableBuilder};
 // Create tables with the builder pattern
 let table = TableBuilder::new()
     .headers(vec![
-        Node::Text("Name".into()), 
+        Node::Text("Name".into()),
         Node::Text("Age".into())
     ])
     .add_row(vec![
@@ -92,7 +93,7 @@ GFM Support:
 The library provides dedicated HTML writing capabilities through the `HtmlWriter` class:
 
 ```rust
-use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node};
+use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node, traits::ToHtml};
 
 // Create HTML writer with custom options
 let options = HtmlWriterOptions {
@@ -108,7 +109,7 @@ let mut writer = HtmlWriter::with_options(options);
 
 // Write some nodes
 let paragraph = Node::Paragraph(vec![Node::Text("Hello HTML".into())]);
-writer.write_node(&paragraph).unwrap();
+paragraph.to_html(&mut writer).unwrap();
 
 // Get resulting HTML
 let html = writer.into_string();
@@ -117,22 +118,22 @@ assert_eq!(html, "<p>Hello HTML</p>\n");
 
 ## Custom Nodes
 
+The recommended way to build custom nodes is via standard Rust traits. Implement Format for each writer you want to support, and optionally MultiFormat for capability checks and HTML fallback.
+
 ```rust
-use cmark_writer::{CommonMarkWriter, HtmlWriter, HtmlWriteResult, Node};
-use cmark_writer::WriteResult;
-use cmark_writer::custom_node;
+use cmark_writer::traits::{Format, ToCommonMark, ToHtml, MultiFormat};
+use cmark_writer::{CommonMarkWriter, HtmlWriter, WriteResult};
 use ecow::EcoString;
 
+// Inline custom node with CommonMark + HTML implementations
 #[derive(Debug, Clone, PartialEq)]
-#[custom_node(block=false, html_impl=true)]
-struct HighlightNode {
+pub struct HighlightNode {
     content: EcoString,
     color: EcoString,
 }
 
-impl HighlightNode {
-    // Implementation for CommonMark output
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+impl Format<CommonMarkWriter> for HighlightNode {
+    fn format(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         writer.write_str("<span style=\"background-color: ")?;
         writer.write_str(&self.color)?;
         writer.write_str("\">")?;
@@ -140,9 +141,10 @@ impl HighlightNode {
         writer.write_str("</span>")?;
         Ok(())
     }
-    
-    // Optional HTML-specific implementation
-    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+}
+
+impl Format<HtmlWriter> for HighlightNode {
+    fn format(&self, writer: &mut HtmlWriter) -> WriteResult<()> {
         writer.start_tag("span")?;
         writer.attribute("style", &format!("background-color: {}", self.color))?;
         writer.finish_tag()?;
@@ -151,7 +153,153 @@ impl HighlightNode {
         Ok(())
     }
 }
+
+// Block-level custom node example
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalloutBox {
+    title: EcoString,
+    content: EcoString,
+}
+
+impl Format<CommonMarkWriter> for CalloutBox {
+    fn format(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        writer.write_str("<div class=\"callout\">\n  <h4>")?;
+        writer.write_str(&self.title)?;
+        writer.write_str("</h4>\n  <p>")?;
+        writer.write_str(&self.content)?;
+        writer.write_str("</p>\n</div>")?;
+        Ok(())
+    }
+}
+
+impl Format<HtmlWriter> for CalloutBox {
+    fn format(&self, writer: &mut HtmlWriter) -> WriteResult<()> {
+        writer.start_tag("div")?; writer.finish_tag()?;
+        writer.start_tag("h4")?; writer.finish_tag()?; writer.text(&self.title)?; writer.end_tag("h4")?;
+        writer.start_tag("p")?;  writer.finish_tag()?; writer.text(&self.content)?; writer.end_tag("p")?;
+        writer.end_tag("div")?;
+        Ok(())
+    }
+}
+
+// Only CommonMark support with graceful HTML fallback
+#[derive(Debug, Clone, PartialEq)]
+pub struct SimpleNote { content: EcoString }
+
+impl Format<CommonMarkWriter> for SimpleNote {
+    fn format(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        writer.write_str("> **Note:** ")?;
+        writer.write_str(&self.content)?;
+        Ok(())
+    }
+}
+
+
+// Usage
+let highlight = HighlightNode { content: "important".into(), color: "yellow".into() };
+let mut md = CommonMarkWriter::new();
+let mut html = HtmlWriter::new();
+highlight.to_commonmark(&mut md).unwrap();
+highlight.to_html(&mut html).unwrap();
+assert!(highlight.supports_html());
 ```
+
+### Simplified Custom Nodes with Derive Macro
+
+For custom nodes that only support CommonMark output, you can use the `#[derive(CommonMarkOnly)]` macro to automatically implement the `MultiFormat` trait with appropriate defaults:
+
+```rust
+use cmark_writer::traits::{Format, MultiFormat, ToCommonMark};
+use cmark_writer::{CommonMarkWriter, HtmlWriter};
+use ecow::EcoString;
+
+// Simple custom node with automatic MultiFormat implementation for CommonMark-only nodes
+#[derive(Debug, Clone, PartialEq, cmark_writer::CommonMarkOnly)]
+pub struct SimpleNote {
+    pub content: EcoString,
+}
+
+// Only implement CommonMark format
+impl Format<CommonMarkWriter> for SimpleNote {
+    fn format(&self, writer: &mut CommonMarkWriter) -> cmark_writer::error::WriteResult<()> {
+        writer.write_str("> **Note:** ")?;
+        writer.write_str(&self.content)?;
+        Ok(())
+    }
+}
+
+// Usage - MultiFormat methods are automatically available
+let note = SimpleNote { content: "This is a note".into() };
+
+// Check format support
+assert!(!note.supports_html()); // Returns false since only CommonMark is implemented
+
+// CommonMark rendering works as expected
+let mut md = CommonMarkWriter::new();
+note.to_commonmark(&mut md).unwrap();
+assert_eq!(md.into_string(), "> **Note:** This is a note");
+
+// HTML rendering provides a helpful fallback comment
+let mut html = HtmlWriter::new();
+note.html_format(&mut html).unwrap();
+assert!(html.into_string().contains("HTML rendering not implemented"));
+```
+
+The `CommonMarkOnly` derive macro automatically provides:
+- `supports_html()` method that returns `false`
+- `html_format()` method that outputs a helpful comment indicating HTML is not supported
+- No need to manually implement `MultiFormat` trait for CommonMark-only custom nodes
+
+**Note**: This macro is specifically for nodes that only support CommonMark. For nodes that support both CommonMark and HTML formats, implement both `Format<CommonMarkWriter>` and `Format<HtmlWriter>`, and the `MultiFormat` trait will be automatically implemented through the blanket implementation.
+
+This approach provides:
+
+- Type safety and clear format boundaries
+- Easy extensibility for new formats
+- Consistent, idiomatic Rust traits across the API
+
+## Custom Error Handling
+
+The library provides convenient macros for creating structured custom errors:
+
+```rust
+use cmark_writer::{coded_error, structure_error, WriteError};
+
+// Structure error - for invalid document structure
+#[structure_error(format = "表格列数不匹配：{}")]
+struct TableColumnMismatchError(pub &'static str);
+
+// Coded error - for custom errors with error codes
+#[coded_error]
+struct MarkdownSyntaxError(pub String, pub String);
+
+// Usage examples
+fn validate_table() -> Result<(), WriteError> {
+    // Create structure error
+    let err = TableColumnMismatchError("第 3 行有 4 列，但表头只有 3 列").into_error();
+    // Result: "Invalid structure: 表格列数不匹配：第 3 行有 4 列，但表头只有 3 列"
+    
+    // Create coded error
+    let err = MarkdownSyntaxError(
+        "缺少闭合代码块标记".into(), 
+        "CODE_BLOCK_UNCLOSED".into()
+    ).into_error();
+    // Result: "Custom error [CODE_BLOCK_UNCLOSED]: 缺少闭合代码块标记"
+    
+    Ok(())
+}
+
+// Convert to standard WriteError
+let write_err: WriteError = TableColumnMismatchError("错误示例").into();
+assert!(matches!(write_err, WriteError::InvalidStructure(_)));
+```
+
+The error macros provide:
+
+- **`#[structure_error]`**: For document structure validation errors
+- **`#[coded_error]`**: For custom errors with error codes and messages
+- Automatic conversion to `WriteError` types
+- Consistent error formatting and display
 
 ## Development
 

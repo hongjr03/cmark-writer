@@ -1,12 +1,12 @@
 //! Node definitions for the CommonMark AST.
 
-use super::custom::CustomNode;
 use super::html::HtmlElement;
+use crate::traits::CustomNode;
 use ecow::EcoString;
 use std::boxed::Box;
 
 /// Code block type according to CommonMark specification
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum CodeBlockType {
     /// Indented code block - composed of one or more indented chunks, each preceded by four or more spaces
     Indented,
@@ -16,7 +16,7 @@ pub enum CodeBlockType {
 }
 
 /// Heading type according to CommonMark specification
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum HeadingType {
     /// ATX Type - Beginning with #
     #[default]
@@ -51,7 +51,7 @@ pub enum TaskListStatus {
 }
 
 /// Main node type, representing an element in a CommonMark document
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum Node {
     /// Root document node, contains child nodes
     Document(Vec<Node>),
@@ -212,6 +212,241 @@ pub enum Node {
 impl Default for Node {
     fn default() -> Self {
         Node::Document(vec![])
+    }
+}
+
+impl Clone for Node {
+    fn clone(&self) -> Self {
+        match self {
+            Node::Document(nodes) => Node::Document(nodes.clone()),
+            Node::ThematicBreak => Node::ThematicBreak,
+            Node::Heading {
+                level,
+                content,
+                heading_type,
+            } => Node::Heading {
+                level: *level,
+                content: content.clone(),
+                heading_type: *heading_type,
+            },
+            Node::CodeBlock {
+                language,
+                content,
+                block_type,
+            } => Node::CodeBlock {
+                language: language.clone(),
+                content: content.clone(),
+                block_type: *block_type,
+            },
+            Node::HtmlBlock(html) => Node::HtmlBlock(html.clone()),
+            Node::LinkReferenceDefinition {
+                label,
+                destination,
+                title,
+            } => Node::LinkReferenceDefinition {
+                label: label.clone(),
+                destination: destination.clone(),
+                title: title.clone(),
+            },
+            Node::Paragraph(content) => Node::Paragraph(content.clone()),
+            Node::BlockQuote(content) => Node::BlockQuote(content.clone()),
+            Node::OrderedList { start, items } => Node::OrderedList {
+                start: *start,
+                items: items.clone(),
+            },
+            Node::UnorderedList(items) => Node::UnorderedList(items.clone()),
+            #[cfg(feature = "gfm")]
+            Node::Table {
+                headers,
+                alignments,
+                rows,
+            } => Node::Table {
+                headers: headers.clone(),
+                alignments: alignments.clone(),
+                rows: rows.clone(),
+            },
+            #[cfg(not(feature = "gfm"))]
+            Node::Table { headers, rows } => Node::Table {
+                headers: headers.clone(),
+                rows: rows.clone(),
+            },
+            Node::InlineCode(code) => Node::InlineCode(code.clone()),
+            Node::Emphasis(content) => Node::Emphasis(content.clone()),
+            Node::Strong(content) => Node::Strong(content.clone()),
+            Node::Strikethrough(content) => Node::Strikethrough(content.clone()),
+            Node::Link {
+                url,
+                title,
+                content,
+            } => Node::Link {
+                url: url.clone(),
+                title: title.clone(),
+                content: content.clone(),
+            },
+            Node::ReferenceLink { label, content } => Node::ReferenceLink {
+                label: label.clone(),
+                content: content.clone(),
+            },
+            Node::Image { url, title, alt } => Node::Image {
+                url: url.clone(),
+                title: title.clone(),
+                alt: alt.clone(),
+            },
+            Node::Autolink { url, is_email } => Node::Autolink {
+                url: url.clone(),
+                is_email: *is_email,
+            },
+            Node::ExtendedAutolink(url) => Node::ExtendedAutolink(url.clone()),
+            Node::HtmlElement(element) => Node::HtmlElement(element.clone()),
+            Node::HardBreak => Node::HardBreak,
+            Node::SoftBreak => Node::SoftBreak,
+            Node::Text(text) => Node::Text(text.clone()),
+            Node::Custom(_custom) => {
+                // 暂时不支持自定义节点的克隆，因为我们简化了设计
+                // 用户应该使用 Format trait 而不是直接使用 Custom 节点
+                panic!("Custom node cloning not supported in simplified design")
+            }
+        }
+    }
+}
+
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Node::Document(a), Node::Document(b)) => a == b,
+            (Node::ThematicBreak, Node::ThematicBreak) => true,
+            (
+                Node::Heading {
+                    level: l1,
+                    content: c1,
+                    heading_type: h1,
+                },
+                Node::Heading {
+                    level: l2,
+                    content: c2,
+                    heading_type: h2,
+                },
+            ) => l1 == l2 && c1 == c2 && h1 == h2,
+            (
+                Node::CodeBlock {
+                    language: l1,
+                    content: c1,
+                    block_type: b1,
+                },
+                Node::CodeBlock {
+                    language: l2,
+                    content: c2,
+                    block_type: b2,
+                },
+            ) => l1 == l2 && c1 == c2 && b1 == b2,
+            (Node::HtmlBlock(a), Node::HtmlBlock(b)) => a == b,
+            (
+                Node::LinkReferenceDefinition {
+                    label: l1,
+                    destination: d1,
+                    title: t1,
+                },
+                Node::LinkReferenceDefinition {
+                    label: l2,
+                    destination: d2,
+                    title: t2,
+                },
+            ) => l1 == l2 && d1 == d2 && t1 == t2,
+            (Node::Paragraph(a), Node::Paragraph(b)) => a == b,
+            (Node::BlockQuote(a), Node::BlockQuote(b)) => a == b,
+            (
+                Node::OrderedList {
+                    start: s1,
+                    items: i1,
+                },
+                Node::OrderedList {
+                    start: s2,
+                    items: i2,
+                },
+            ) => s1 == s2 && i1 == i2,
+            (Node::UnorderedList(a), Node::UnorderedList(b)) => a == b,
+            #[cfg(feature = "gfm")]
+            (
+                Node::Table {
+                    headers: h1,
+                    alignments: a1,
+                    rows: r1,
+                },
+                Node::Table {
+                    headers: h2,
+                    alignments: a2,
+                    rows: r2,
+                },
+            ) => h1 == h2 && a1 == a2 && r1 == r2,
+            #[cfg(not(feature = "gfm"))]
+            (
+                Node::Table {
+                    headers: h1,
+                    rows: r1,
+                },
+                Node::Table {
+                    headers: h2,
+                    rows: r2,
+                },
+            ) => h1 == h2 && r1 == r2,
+            (Node::InlineCode(a), Node::InlineCode(b)) => a == b,
+            (Node::Emphasis(a), Node::Emphasis(b)) => a == b,
+            (Node::Strong(a), Node::Strong(b)) => a == b,
+            #[cfg(feature = "gfm")]
+            (Node::Strikethrough(a), Node::Strikethrough(b)) => a == b,
+            (
+                Node::Link {
+                    url: u1,
+                    title: t1,
+                    content: c1,
+                },
+                Node::Link {
+                    url: u2,
+                    title: t2,
+                    content: c2,
+                },
+            ) => u1 == u2 && t1 == t2 && c1 == c2,
+            (
+                Node::ReferenceLink {
+                    label: l1,
+                    content: c1,
+                },
+                Node::ReferenceLink {
+                    label: l2,
+                    content: c2,
+                },
+            ) => l1 == l2 && c1 == c2,
+            (
+                Node::Image {
+                    url: u1,
+                    title: t1,
+                    alt: a1,
+                },
+                Node::Image {
+                    url: u2,
+                    title: t2,
+                    alt: a2,
+                },
+            ) => u1 == u2 && t1 == t2 && a1 == a2,
+            (
+                Node::Autolink {
+                    url: u1,
+                    is_email: e1,
+                },
+                Node::Autolink {
+                    url: u2,
+                    is_email: e2,
+                },
+            ) => u1 == u2 && e1 == e2,
+            #[cfg(feature = "gfm")]
+            (Node::ExtendedAutolink(a), Node::ExtendedAutolink(b)) => a == b,
+            (Node::HtmlElement(a), Node::HtmlElement(b)) => a == b,
+            (Node::HardBreak, Node::HardBreak) => true,
+            (Node::SoftBreak, Node::SoftBreak) => true,
+            (Node::Text(a), Node::Text(b)) => a == b,
+            (Node::Custom(a), Node::Custom(b)) => a.eq_box(&**b),
+            _ => false,
+        }
     }
 }
 
@@ -383,5 +618,21 @@ impl Node {
     /// Check if a node is a custom node of a specific type
     pub fn is_custom_type<T: CustomNode + 'static>(&self) -> bool {
         self.as_custom_type::<T>().is_some()
+    }
+}
+
+// Implement Format traits for Node
+impl crate::traits::Format<crate::writer::CommonMarkWriter> for Node {
+    fn format(
+        &self,
+        writer: &mut crate::writer::CommonMarkWriter,
+    ) -> crate::error::WriteResult<()> {
+        writer.write_node_internal(self)
+    }
+}
+
+impl crate::traits::Format<crate::writer::HtmlWriter> for Node {
+    fn format(&self, writer: &mut crate::writer::HtmlWriter) -> crate::error::WriteResult<()> {
+        writer.write_node_internal(self).map_err(Into::into)
     }
 }

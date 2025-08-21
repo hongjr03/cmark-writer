@@ -14,6 +14,7 @@ mod gfm_tests {
     use cmark_writer::ast::{ListItem, Node, TableAlignment, TaskListStatus};
     use cmark_writer::options::WriterOptionsBuilder;
     use cmark_writer::writer::CommonMarkWriter;
+    use cmark_writer::ToCommonMark;
 
     /// Helper function to create a writer with GFM features enabled
     fn create_gfm_writer() -> CommonMarkWriter {
@@ -32,7 +33,8 @@ mod gfm_tests {
 
         // Write with GFM enabled
         let mut writer = create_gfm_writer();
-        writer.write(&node).expect("Failed to write node");
+        node.to_commonmark(&mut writer)
+            .expect("Failed to write node");
         let result = writer.into_string();
 
         // Verify result includes strikethrough markers
@@ -76,7 +78,8 @@ mod gfm_tests {
 
         // Write with GFM enabled
         let mut writer = create_gfm_writer();
-        writer.write(&node).expect("Failed to write node");
+        node.to_commonmark(&mut writer)
+            .expect("Failed to write node");
         let result = writer.into_string();
 
         // Verify result includes checkbox syntax
@@ -118,11 +121,12 @@ mod gfm_tests {
 
         // Write with GFM enabled
         let mut writer = create_gfm_writer();
-        writer.write(&node).expect("Failed to write node");
+        node.to_commonmark(&mut writer)
+            .expect("Failed to write node");
         let result = writer.into_string();
 
         // Verify table has correct alignment markers
-        let expected = "| Left | Center | Right | Default |\n| :--- | :---: | ---: | --- |\n| L1 | C1 | R1 | D1 |\n| L2 | C2 | R2 | D2 |\n";
+        let expected = "| Left | Center | Right | Default |\n| :--- | :---: | ---: | --- |\n| L1 | C1 | R1 | D1 |\n| L2 | C2 | R2 | D2 |\n\n";
         assert_eq!(result, expected);
     }
 
@@ -137,7 +141,8 @@ mod gfm_tests {
 
         // Write with GFM enabled
         let mut writer = create_gfm_writer();
-        writer.write(&node).expect("Failed to write node");
+        node.to_commonmark(&mut writer)
+            .expect("Failed to write node");
         let result = writer.into_string();
 
         // The extended autolink should be preserved without angle brackets
@@ -166,7 +171,8 @@ mod gfm_tests {
 
         // Write with GFM enabled
         let mut writer = create_gfm_writer();
-        writer.write(&node).expect("Failed to write node");
+        node.to_commonmark(&mut writer)
+            .expect("Failed to write node");
         let result = writer.into_string();
 
         // The script tag should be escaped to prevent execution
@@ -195,7 +201,8 @@ mod gfm_tests {
 
         // Write with GFM enabled
         let mut writer = create_gfm_writer();
-        writer.write(&node).expect("Failed to write node");
+        node.to_commonmark(&mut writer)
+            .expect("Failed to write node");
         let result = writer.into_string();
 
         // The div tag should not be escaped since it's allowed
@@ -220,11 +227,13 @@ mod gfm_tests {
         let document = Node::Document(vec![task, table]);
 
         let mut writer = create_gfm_writer();
-        writer.write(&document).expect("Failed to write document");
+        document
+            .to_commonmark(&mut writer)
+            .expect("Failed to write document");
         let result = writer.into_string();
 
         // Expected output with task list and table
-        let expected = "- [x] A completed task\n\n| Header |\n| :---: |\n| Cell |\n";
+        let expected = "- [x] A completed task\n\n| Header |\n| :---: |\n| Cell |\n\n";
         assert_eq!(result, expected);
     }
 
@@ -249,7 +258,8 @@ mod gfm_tests {
         let options = WriterOptionsBuilder::new().build(); // GFM disabled by default
 
         let mut writer = CommonMarkWriter::with_options(options);
-        writer.write(&node).expect("Failed to write node");
+        node.to_commonmark(&mut writer)
+            .expect("Failed to write node");
         let result = writer.into_string();
 
         // GFM syntax should not be used when disabled
