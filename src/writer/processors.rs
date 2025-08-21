@@ -325,7 +325,14 @@ impl NodeProcessor for CustomNodeProcessor {
 
     fn process_html(&self, writer: &mut crate::writer::HtmlWriter, node: &Node) -> WriteResult<()> {
         match node {
-            Node::Custom(custom_node) => custom_node.html_render(writer),
+            Node::Custom(custom_node) => {
+                // Attempt to cast to HtmlRenderable trait object
+                if let Some(renderable) = custom_node.as_html_renderable() {
+                    renderable.html_render(writer)
+                } else {
+                    Err(WriteError::MissingHtmlRenderMethod)
+                }
+            }
             _ => Err(WriteError::UnsupportedNodeType),
         }
     }
