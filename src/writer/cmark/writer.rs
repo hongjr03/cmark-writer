@@ -128,6 +128,7 @@ impl CommonMarkWriter {
     pub fn write_node_internal(&mut self, node: &Node) -> WriteResult<()> {
         // 处理自定义节点
         if let Node::Custom(custom_node) = node {
+            // Ensure that CustomNode trait requires render_commonmark method
             return custom_node.render_commonmark(self);
         }
 
