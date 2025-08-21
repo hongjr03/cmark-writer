@@ -7,15 +7,17 @@ pub use crate::ast::{CodeBlockType, HeadingType, HtmlAttribute, HtmlElement, Lis
 // Error types
 pub use crate::error::{CodedError, StructureError, WriteError, WriteResult};
 
-// New trait-based architecture
+// Unified trait architecture
 pub use crate::traits::{
-    BlockNodeProcessor, CommonMarkRenderable, ConfigurableProcessor, CustomNode, ErrorContext,
-    ErrorFactory, HtmlRenderable, InlineNodeProcessor, NodeClone, NodeContent, NodeProcessor,
-    Writer,
+    // Core traits
+    CustomNode, NodeClone, NodeContent, Writer,
+    // Formatting traits
+    CommonMarkRenderable, Format, HtmlRenderable, MultiFormat, ToCommonMark, ToHtml,
+    // Processing traits
+    BlockNodeProcessor, ConfigurableProcessor, InlineNodeProcessor, NodeProcessor,
+    // Utility traits
+    ErrorContext, ErrorFactory,
 };
-
-// Format traits for better custom node design
-pub use crate::format_traits::{Format, MultiFormat, ToCommonMark, ToHtml};
 
 // New processors
 pub use crate::writer::processors::{
@@ -37,7 +39,6 @@ pub use cmark_writer_macros::{coded_error, structure_error, CommonMarkOnly};
 
 pub mod ast;
 pub mod error;
-pub mod format_traits;
 pub mod options;
 pub mod traits;
 pub mod writer;

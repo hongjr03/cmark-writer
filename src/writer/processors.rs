@@ -1,6 +1,6 @@
-//! 新的节点处理器实现
+//! New node processor implementation
 //!
-//! 使用新的trait架构重写的处理器系统
+//! Processor system rewritten with new trait architecture
 
 use crate::ast::Node;
 use crate::error::{WriteError, WriteResult};
@@ -8,12 +8,12 @@ use crate::traits::{
     BlockNodeProcessor, ConfigurableProcessor, InlineNodeProcessor, NodeProcessor, Writer,
 };
 
-/// 块级处理器配置
+/// Block processor configuration
 #[derive(Debug, Clone)]
 pub struct BlockProcessorConfig {
-    /// 是否确保尾部换行
+    /// Whether to ensure trailing newlines
     pub ensure_trailing_newlines: bool,
-    /// 块级分隔符
+    /// Block separator
     pub block_separator: String,
 }
 
@@ -26,12 +26,12 @@ impl Default for BlockProcessorConfig {
     }
 }
 
-/// 内联处理器配置
+/// Inline processor configuration
 #[derive(Debug, Clone)]
 pub struct InlineProcessorConfig {
-    /// 严格模式验证
+    /// Enable strict validation mode
     pub strict_validation: bool,
-    /// 是否允许换行
+    /// Allow newlines in inline elements
     pub allow_newlines: bool,
 }
 
@@ -44,21 +44,21 @@ impl Default for InlineProcessorConfig {
     }
 }
 
-/// 增强的块级节点处理器
+/// Enhanced block node processor
 #[derive(Debug)]
 pub struct EnhancedBlockProcessor {
     config: BlockProcessorConfig,
 }
 
 impl EnhancedBlockProcessor {
-    /// 创建新的块级处理器
+    /// Create a new block processor
     pub fn new() -> Self {
         Self {
             config: BlockProcessorConfig::default(),
         }
     }
 
-    /// 使用自定义配置创建
+    /// Create with custom configuration
     pub fn with_config(config: BlockProcessorConfig) -> Self {
         Self { config }
     }
@@ -172,21 +172,21 @@ impl ConfigurableProcessor for EnhancedBlockProcessor {
     }
 }
 
-/// 增强的内联节点处理器
+/// Enhanced inline node processor
 #[derive(Debug)]
 pub struct EnhancedInlineProcessor {
     config: InlineProcessorConfig,
 }
 
 impl EnhancedInlineProcessor {
-    /// 创建新的内联处理器
+    /// Create a new inline processor
     pub fn new() -> Self {
         Self {
             config: InlineProcessorConfig::default(),
         }
     }
 
-    /// 使用自定义配置创建
+    /// Create with custom configuration
     pub fn with_config(config: InlineProcessorConfig) -> Self {
         Self { config }
     }
@@ -266,7 +266,7 @@ impl NodeProcessor for EnhancedInlineProcessor {
 impl InlineNodeProcessor for EnhancedInlineProcessor {
     fn validate_inline_content(&self, node: &Node) -> WriteResult<()> {
         if !self.config.allow_newlines && !matches!(node, Node::SoftBreak | Node::HardBreak) {
-            // 验证逻辑 - 检查是否包含换行符
+            // Validation logic - check for newlines
             match node {
                 Node::Text(content) => {
                     if content.contains('\n') {
@@ -275,7 +275,7 @@ impl InlineNodeProcessor for EnhancedInlineProcessor {
                         ));
                     }
                 }
-                _ => {} // 其他类型的验证可以在这里添加
+                _ => {} // Additional type validations can be added here
             }
         }
         Ok(())
@@ -294,7 +294,7 @@ impl ConfigurableProcessor for EnhancedInlineProcessor {
     }
 }
 
-/// 自定义节点处理器
+/// Custom node processor
 #[derive(Debug, Default)]
 pub struct CustomNodeProcessor;
 
@@ -330,6 +330,6 @@ impl NodeProcessor for CustomNodeProcessor {
     }
 
     fn priority(&self) -> u32 {
-        200 // 高优先级处理自定义节点
+        200 // High priority for custom node processing
     }
 }

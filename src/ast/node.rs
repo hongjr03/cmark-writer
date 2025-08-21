@@ -622,7 +622,7 @@ impl Node {
 }
 
 // Implement Format traits for Node
-impl crate::format_traits::Format<crate::writer::CommonMarkWriter> for Node {
+impl crate::traits::Format<crate::writer::CommonMarkWriter> for Node {
     fn format(
         &self,
         writer: &mut crate::writer::CommonMarkWriter,
@@ -631,7 +631,7 @@ impl crate::format_traits::Format<crate::writer::CommonMarkWriter> for Node {
     }
 }
 
-impl crate::format_traits::Format<crate::writer::HtmlWriter> for Node {
+impl crate::traits::Format<crate::writer::HtmlWriter> for Node {
     fn format(&self, writer: &mut crate::writer::HtmlWriter) -> crate::error::WriteResult<()> {
         writer.write_node_internal(self).map_err(Into::into)
     }

@@ -13,7 +13,7 @@ A CommonMark writer implementation in Rust.
 ```rust
 use cmark_writer::ast::{Node, ListItem};
 use cmark_writer::writer::CommonMarkWriter;
-use cmark_writer::ToCommonMark;
+use cmark_writer::traits::ToCommonMark;
 
 // Create a document
 let document = Node::Document(vec![
@@ -93,7 +93,7 @@ GFM Support:
 The library provides dedicated HTML writing capabilities through the `HtmlWriter` class:
 
 ```rust
-use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node, ToHtml};
+use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node, traits::ToHtml};
 
 // Create HTML writer with custom options
 let options = HtmlWriterOptions {
@@ -121,7 +121,7 @@ assert_eq!(html, "<p>Hello HTML</p>\n");
 The recommended way to build custom nodes is via standard Rust traits. Implement Format for each writer you want to support, and optionally MultiFormat for capability checks and HTML fallback.
 
 ```rust
-use cmark_writer::{Format, ToCommonMark, ToHtml, MultiFormat};
+use cmark_writer::traits::{Format, ToCommonMark, ToHtml, MultiFormat};
 use cmark_writer::{CommonMarkWriter, HtmlWriter, WriteResult};
 use ecow::EcoString;
 
@@ -209,7 +209,8 @@ assert!(highlight.supports_html());
 For custom nodes that only support CommonMark output, you can use the `#[derive(CommonMarkOnly)]` macro to automatically implement the `MultiFormat` trait with appropriate defaults:
 
 ```rust
-use cmark_writer::{Format, MultiFormat, ToCommonMark, CommonMarkWriter, HtmlWriter};
+use cmark_writer::traits::{Format, MultiFormat, ToCommonMark};
+use cmark_writer::{CommonMarkWriter, HtmlWriter};
 use ecow::EcoString;
 
 // Simple custom node with automatic MultiFormat implementation for CommonMark-only nodes

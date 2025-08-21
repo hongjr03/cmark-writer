@@ -12,7 +12,7 @@ use log;
 /// - Directly with individual nodes through methods like `write_node`
 /// - For building HTML elements programmatically using the tag and attribute methods
 /// - As part of the CommonMarkWriter's HTML rendering process
-/// - 在自定义节点实现中直接调用 HtmlWriter API（已不再推荐使用 `html_impl` 属性）
+/// - Calling HtmlWriter API directly in custom node implementations (use of `html_impl` attribute is no longer recommended)
 ///
 /// # Examples
 ///
@@ -940,10 +940,3 @@ fn render_nodes_to_plain_text_string(nodes: &[Node], options: &HtmlWriterOptions
     render_nodes_to_plain_text(nodes, &mut s, options);
     s
 }
-
-// Example of how CustomNode's html_write might be expected by the HtmlWriter:
-// (This would be part of the CustomNode trait definition and its implementations)
-// pub trait CustomNode {
-//     // ... other methods ...
-//     fn html_write(&self, options: &HtmlRenderOptions) -> Result<EcoString, EcoString>; // EcoString for error msg
-// }

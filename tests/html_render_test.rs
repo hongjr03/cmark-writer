@@ -22,11 +22,11 @@ mod tests {
                 fn log(&self, record: &log::Record) {
                     if self.enabled(record.metadata()) {
                         let color_code = match record.level() {
-                            log::Level::Error => "\x1b[31m", // 红色
-                            log::Level::Warn => "\x1b[33m",  // 黄色
-                            log::Level::Info => "\x1b[32m",  // 绿色
-                            log::Level::Debug => "\x1b[34m", // 蓝色
-                            log::Level::Trace => "\x1b[90m", // 灰色
+                            log::Level::Error => "\x1b[31m", // Red
+                            log::Level::Warn => "\x1b[33m",  // Yellow
+                            log::Level::Info => "\x1b[32m",  // Green
+                            log::Level::Debug => "\x1b[34m", // Blue
+                            log::Level::Trace => "\x1b[90m", // Gray
                         };
                         let reset = "\x1b[0m";
                         println!(
