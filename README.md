@@ -123,7 +123,6 @@ The recommended way to build custom nodes is via standard Rust traits. Implement
 ```rust
 use cmark_writer::{Format, ToCommonMark, ToHtml, MultiFormat};
 use cmark_writer::{CommonMarkWriter, HtmlWriter, WriteResult};
-use cmark_writer::format_traits::default_html_render;
 use ecow::EcoString;
 
 // Inline custom node with CommonMark + HTML implementations
@@ -155,11 +154,6 @@ impl Format<HtmlWriter> for HighlightNode {
     }
 }
 
-impl MultiFormat for HighlightNode {
-    fn supports_html(&self) -> bool { true }
-    fn html_format(&self, writer: &mut HtmlWriter) -> WriteResult<()> { self.to_html(writer) }
-}
-
 // Block-level custom node example
 #[derive(Debug, Clone, PartialEq)]
 pub struct CalloutBox {
@@ -188,11 +182,6 @@ impl Format<HtmlWriter> for CalloutBox {
     }
 }
 
-impl MultiFormat for CalloutBox {
-    fn supports_html(&self) -> bool { true }
-    fn html_format(&self, writer: &mut HtmlWriter) -> WriteResult<()> { self.to_html(writer) }
-}
-
 // Only CommonMark support with graceful HTML fallback
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimpleNote { content: EcoString }
@@ -205,10 +194,6 @@ impl Format<CommonMarkWriter> for SimpleNote {
     }
 }
 
-impl MultiFormat for SimpleNote {
-    fn supports_html(&self) -> bool { false }
-    fn html_format(&self, writer: &mut HtmlWriter) -> WriteResult<()> { default_html_render(self, writer) }
-}
 
 // Usage
 let highlight = HighlightNode { content: "important".into(), color: "yellow".into() };
@@ -218,6 +203,53 @@ highlight.to_commonmark(&mut md).unwrap();
 highlight.to_html(&mut html).unwrap();
 assert!(highlight.supports_html());
 ```
+
+### Simplified Custom Nodes with Derive Macro
+
+For custom nodes that only support CommonMark output, you can use the `#[derive(CommonMarkOnly)]` macro to automatically implement the `MultiFormat` trait with appropriate defaults:
+
+```rust
+use cmark_writer::{Format, MultiFormat, ToCommonMark, CommonMarkWriter, HtmlWriter};
+use ecow::EcoString;
+
+// Simple custom node with automatic MultiFormat implementation for CommonMark-only nodes
+#[derive(Debug, Clone, PartialEq, cmark_writer::CommonMarkOnly)]
+pub struct SimpleNote {
+    pub content: EcoString,
+}
+
+// Only implement CommonMark format
+impl Format<CommonMarkWriter> for SimpleNote {
+    fn format(&self, writer: &mut CommonMarkWriter) -> cmark_writer::error::WriteResult<()> {
+        writer.write_str("> **Note:** ")?;
+        writer.write_str(&self.content)?;
+        Ok(())
+    }
+}
+
+// Usage - MultiFormat methods are automatically available
+let note = SimpleNote { content: "This is a note".into() };
+
+// Check format support
+assert!(!note.supports_html()); // Returns false since only CommonMark is implemented
+
+// CommonMark rendering works as expected
+let mut md = CommonMarkWriter::new();
+note.to_commonmark(&mut md).unwrap();
+assert_eq!(md.into_string(), "> **Note:** This is a note");
+
+// HTML rendering provides a helpful fallback comment
+let mut html = HtmlWriter::new();
+note.html_format(&mut html).unwrap();
+assert!(html.into_string().contains("HTML rendering not implemented"));
+```
+
+The `CommonMarkOnly` derive macro automatically provides:
+- `supports_html()` method that returns `false`
+- `html_format()` method that outputs a helpful comment indicating HTML is not supported
+- No need to manually implement `MultiFormat` trait for CommonMark-only custom nodes
+
+**Note**: This macro is specifically for nodes that only support CommonMark. For nodes that support both CommonMark and HTML formats, implement both `Format<CommonMarkWriter>` and `Format<HtmlWriter>`, and the `MultiFormat` trait will be automatically implemented through the blanket implementation.
 
 This approach provides:
 

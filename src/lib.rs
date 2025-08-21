@@ -15,9 +15,7 @@ pub use crate::traits::{
 };
 
 // Format traits for better custom node design
-pub use crate::format_traits::{
-    default_html_render, CommonMarkFormat, Format, HtmlFormat, MultiFormat, ToCommonMark, ToHtml,
-};
+pub use crate::format_traits::{Format, MultiFormat, ToCommonMark, ToHtml};
 
 // New processors
 pub use crate::writer::processors::{
@@ -34,8 +32,8 @@ pub use crate::writer::CommonMarkWriter;
 // HTML writer related exports
 pub use crate::writer::{HtmlWriteError, HtmlWriteResult, HtmlWriter, HtmlWriterOptions};
 
-// Export proc-macro attributes (retain only error-related macros)
-pub use cmark_writer_macros::{coded_error, structure_error};
+// Export proc-macro attributes and derive macros
+pub use cmark_writer_macros::{coded_error, structure_error, CommonMarkOnly};
 
 pub mod ast;
 pub mod error;

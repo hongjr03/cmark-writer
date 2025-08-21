@@ -30,16 +30,7 @@ impl Format<HtmlWriter> for HighlightNode {
     }
 }
 
-impl MultiFormat for HighlightNode {
-    fn supports_html(&self) -> bool {
-        true
-    }
-    fn html_format(&self, writer: &mut HtmlWriter) -> cmark_writer::error::WriteResult<()> {
-        self.to_html(writer)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, cmark_writer::CommonMarkOnly)]
 pub struct SimpleNote {
     pub content: EcoString,
 }
@@ -49,15 +40,6 @@ impl Format<CommonMarkWriter> for SimpleNote {
         w.write_str("> **Note:** ")?;
         w.write_str(&self.content)?;
         Ok(())
-    }
-}
-
-impl MultiFormat for SimpleNote {
-    fn supports_html(&self) -> bool {
-        false
-    }
-    fn html_format(&self, writer: &mut HtmlWriter) -> cmark_writer::error::WriteResult<()> {
-        cmark_writer::format_traits::default_html_render(self, writer)
     }
 }
 

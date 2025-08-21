@@ -5,6 +5,45 @@ use syn::{parse_macro_input, DeriveInput};
 
 // Note: The legacy `custom_node` attribute macro has been removed.
 
+/// Derive macro for automatically implementing MultiFormat trait for types that only support CommonMark
+/// This macro is intended for custom nodes that only implement Format<CommonMarkWriter>
+/// and want default HTML fallback behavior.
+///
+/// # Example
+///
+/// ```rust
+/// use cmark_writer_macros::CommonMarkOnly;
+///
+/// #[derive(CommonMarkOnly)]
+/// struct SimpleNote {
+///     content: String,
+/// }
+/// ```
+#[proc_macro_derive(CommonMarkOnly)]
+pub fn derive_commonmark_only(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let expanded = quote! {
+        impl ::cmark_writer::MultiFormat for #name {
+            fn supports_html(&self) -> bool {
+                false
+            }
+
+            fn html_format(&self, writer: &mut ::cmark_writer::HtmlWriter) -> ::cmark_writer::error::WriteResult<()> {
+                writer
+                    .raw_html(&format!(
+                        "<!-- HTML rendering not implemented for {} -->",
+                        std::any::type_name::<Self>()
+                    ))
+                    .map_err(Into::into)
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
 /// Custom error attribute macro, replaces the struct form errors in the original define_custom_errors! macro
 ///
 /// # Example

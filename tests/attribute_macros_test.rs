@@ -1,5 +1,4 @@
-// 仅保留 better_custom_nodes 风格用法：Format/ToCommonMark/ToHtml/MultiFormat
-use cmark_writer::{CommonMarkWriter, Format, HtmlWriter, MultiFormat, ToCommonMark, ToHtml};
+use cmark_writer::{CommonMarkWriter, Format, HtmlWriter, ToCommonMark, ToHtml};
 use ecow::EcoString;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,15 +26,6 @@ impl Format<HtmlWriter> for HighlightNode {
         w.text(&self.content)?;
         w.end_tag("span")?;
         Ok(())
-    }
-}
-
-impl MultiFormat for HighlightNode {
-    fn supports_html(&self) -> bool {
-        true
-    }
-    fn html_format(&self, w: &mut HtmlWriter) -> cmark_writer::error::WriteResult<()> {
-        self.to_html(w)
     }
 }
 

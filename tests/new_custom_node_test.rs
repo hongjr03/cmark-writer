@@ -1,6 +1,6 @@
 use cmark_writer::error::WriteResult;
 use cmark_writer::ToCommonMark;
-use cmark_writer::{CommonMarkWriter, Format, HtmlWriter, MultiFormat};
+use cmark_writer::{CommonMarkWriter, Format};
 
 #[derive(Debug, Clone, PartialEq)]
 struct SimpleNote {
@@ -12,15 +12,6 @@ impl Format<CommonMarkWriter> for SimpleNote {
         w.write_str("Note: ")?;
         w.write_str(&self.content)?;
         Ok(())
-    }
-}
-
-impl MultiFormat for SimpleNote {
-    fn supports_html(&self) -> bool {
-        false
-    }
-    fn html_format(&self, w: &mut HtmlWriter) -> WriteResult<()> {
-        cmark_writer::format_traits::default_html_render(self, w)
     }
 }
 
