@@ -133,8 +133,8 @@ impl NodeProcessor for EnhancedBlockProcessor {
                 title,
             } => writer.write_link_reference_definition(label, destination, title),
             Node::Custom(custom_node) if custom_node.is_block() => {
-                // Ensure custom_node implements CommonMarkRenderable
-                CommonMarkRenderable::render_commonmark(custom_node, writer)
+                // CustomNode implements CommonMarkRenderable
+                custom_node.render_commonmark(writer)
             }
             _ => Err(WriteError::UnsupportedNodeType),
         }?;
@@ -419,12 +419,8 @@ impl NodeProcessor for CustomNodeProcessor {
     fn process_html(&self, writer: &mut crate::writer::HtmlWriter, node: &Node) -> WriteResult<()> {
         match node {
             Node::Custom(custom_node) => {
-                // Attempt to cast to HtmlRenderable trait object
-                if let Some(renderable) = custom_node.as_html_renderable() {
-                    renderable.html_render(writer)
-                } else {
-                    Err(WriteError::MissingHtmlRenderMethod)
-                }
+                // Use the html_render method from CustomNode trait
+                custom_node.html_render(writer)
             }
             _ => Err(WriteError::UnsupportedNodeType),
         }

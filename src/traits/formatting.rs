@@ -111,23 +111,15 @@ pub trait MultiFormat: ToCommonMark {
     /// Render to the appropriate format based on writer type
     fn render_multi<W>(&self, writer: &mut W) -> WriteResult<()>
     where
-        W: 'static,
+        W: std::any::Any + 'static,
     {
-        let type_id = std::any::TypeId::of::<W>();
-
-        if type_id == std::any::TypeId::of::<CommonMarkWriter>() {
-            // Safety: We just checked the type
-            let writer = unsafe { &mut *(writer as *mut W as *mut CommonMarkWriter) };
-            self.to_commonmark(writer)
-        } else if type_id == std::any::TypeId::of::<HtmlWriter>() {
-            if self.supports_html() {
-                // Safety: We just checked the type
-                let writer = unsafe { &mut *(writer as *mut W as *mut HtmlWriter) };
-        W: Any + 'static,
-    {
-        if let Some(cm_writer) = (writer as &mut dyn Any).downcast_mut::<CommonMarkWriter>() {
+        if let Some(cm_writer) =
+            (writer as &mut dyn std::any::Any).downcast_mut::<CommonMarkWriter>()
+        {
             self.to_commonmark(cm_writer)
-        } else if let Some(html_writer) = (writer as &mut dyn Any).downcast_mut::<HtmlWriter>() {
+        } else if let Some(html_writer) =
+            (writer as &mut dyn std::any::Any).downcast_mut::<HtmlWriter>()
+        {
             if self.supports_html() {
                 self.html_format(html_writer)
             } else {
@@ -136,18 +128,7 @@ pub trait MultiFormat: ToCommonMark {
                 ))
             }
         } else {
-    fn render_multi(&self, writer: &mut MultiWriter) -> WriteResult<()> {
-        match writer {
-            MultiWriter::CommonMark(w) => self.to_commonmark(w),
-            MultiWriter::Html(w) => {
-                if self.supports_html() {
-                    self.html_format(w)
-                } else {
-                    Err(crate::error::WriteError::custom(
-                        "HTML format not supported for this node type",
-                    ))
-                }
-            }
+            Err(crate::error::WriteError::custom("Unsupported writer type"))
         }
     }
 }
