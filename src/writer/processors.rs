@@ -267,16 +267,109 @@ impl NodeProcessor for EnhancedInlineProcessor {
 impl InlineNodeProcessor for EnhancedInlineProcessor {
     fn validate_inline_content(&self, node: &Node) -> WriteResult<()> {
         if !self.config.allow_newlines && !matches!(node, Node::SoftBreak | Node::HardBreak) {
-            // Validation logic - check for newlines
-            match node {
-                Node::Text(content) => {
-                    if content.contains('\n') {
-                        return Err(WriteError::NewlineInInlineElement(
-                            format!("Text node: {}", content).into(),
-                        ));
+            // Recursive function to check for newlines in text content
+            fn check_for_newlines(node: &Node) -> Result<(), String> {
+                match node {
+                    // Direct text content nodes
+                    Node::Text(content) => {
+                        if content.contains('\n') {
+                            return Err(format!("Text node: {}", content));
+                        }
                     }
+                    Node::InlineCode(content) => {
+                        if content.contains('\n') {
+                            return Err(format!("Inline code: {}", content));
+                        }
+                    }
+                    Node::Autolink { url, .. } => {
+                        if url.contains('\n') {
+                            return Err(format!("Autolink URL: {}", url));
+                        }
+                    }
+                    #[cfg(feature = "gfm")]
+                    Node::ExtendedAutolink(url) => {
+                        if url.contains('\n') {
+                            return Err(format!("Extended autolink URL: {}", url));
+                        }
+                    }
+
+                    // Nodes with child content that needs recursive checking
+                    Node::Emphasis(children)
+                    | Node::Strong(children)
+                    | Node::Strikethrough(children) => {
+                        for child in children {
+                            check_for_newlines(child)?;
+                        }
+                    }
+                    Node::Link {
+                        content,
+                        url,
+                        title,
+                        ..
+                    } => {
+                        // Check URL and title for newlines
+                        if url.contains('\n') {
+                            return Err(format!("Link URL: {}", url));
+                        }
+                        if let Some(title_text) = title {
+                            if title_text.contains('\n') {
+                                return Err(format!("Link title: {}", title_text));
+                            }
+                        }
+                        // Check content recursively
+                        for child in content {
+                            check_for_newlines(child)?;
+                        }
+                    }
+                    Node::ReferenceLink { content, label, .. } => {
+                        // Check label for newlines
+                        if label.contains('\n') {
+                            return Err(format!("Reference link label: {}", label));
+                        }
+                        // Check content recursively
+                        for child in content {
+                            check_for_newlines(child)?;
+                        }
+                    }
+                    Node::Image {
+                        alt, url, title, ..
+                    } => {
+                        // Check URL and title for newlines
+                        if url.contains('\n') {
+                            return Err(format!("Image URL: {}", url));
+                        }
+                        if let Some(title_text) = title {
+                            if title_text.contains('\n') {
+                                return Err(format!("Image title: {}", title_text));
+                            }
+                        }
+                        // Check alt text recursively
+                        for child in alt {
+                            check_for_newlines(child)?;
+                        }
+                    }
+
+                    // HTML elements might contain text, but we allow them for now
+                    Node::HtmlElement(_) => {
+                        // HTML elements are allowed to contain newlines as they might be formatted
+                    }
+
+                    // Custom nodes - delegate validation to the custom node implementation
+                    Node::Custom(_) => {
+                        // Custom nodes should handle their own validation
+                    }
+
+                    // Break nodes are explicitly allowed
+                    Node::SoftBreak | Node::HardBreak => {}
+
+                    // Other nodes shouldn't appear in inline context, but we don't error here
+                    _ => {}
                 }
-                _ => {} // Additional type validations can be added here
+                Ok(())
+            }
+
+            if let Err(error_msg) = check_for_newlines(node) {
+                return Err(WriteError::NewlineInInlineElement(error_msg.into()));
             }
         }
         Ok(())
