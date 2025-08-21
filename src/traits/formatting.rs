@@ -123,7 +123,13 @@ pub trait MultiFormat: ToCommonMark {
             if self.supports_html() {
                 // Safety: We just checked the type
                 let writer = unsafe { &mut *(writer as *mut W as *mut HtmlWriter) };
-                self.html_format(writer)
+        W: Any + 'static,
+    {
+        if let Some(cm_writer) = (writer as &mut dyn Any).downcast_mut::<CommonMarkWriter>() {
+            self.to_commonmark(cm_writer)
+        } else if let Some(html_writer) = (writer as &mut dyn Any).downcast_mut::<HtmlWriter>() {
+            if self.supports_html() {
+                self.html_format(html_writer)
             } else {
                 Err(crate::error::WriteError::custom(
                     "HTML format not supported for this node type",
