@@ -1,3 +1,4 @@
+use cmark_writer::error::WriteResult;
 use cmark_writer::{CommonMarkWriter, Format, HtmlWriter, MultiFormat, ToCommonMark, ToHtml};
 use ecow::EcoString;
 

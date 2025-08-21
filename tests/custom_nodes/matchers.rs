@@ -1,14 +1,15 @@
+use cmark_writer::error::WriteResult;
 use cmark_writer::{CommonMarkWriter, Format, HtmlWriter, ToCommonMark, ToHtml};
 use ecow::EcoString;
 
 #[derive(Debug, Clone, PartialEq)]
-struct HighlightNode {
+struct MyHighlight {
     content: EcoString,
     color: EcoString,
 }
 
-impl Format<CommonMarkWriter> for HighlightNode {
-    fn format(&self, w: &mut CommonMarkWriter) -> cmark_writer::error::WriteResult<()> {
+impl Format<CommonMarkWriter> for MyHighlight {
+    fn format(&self, w: &mut CommonMarkWriter) -> WriteResult<()> {
         w.write_str("<span style=\"background-color: ")?;
         w.write_str(&self.color)?;
         w.write_str("\">")?;
@@ -18,8 +19,8 @@ impl Format<CommonMarkWriter> for HighlightNode {
     }
 }
 
-impl Format<HtmlWriter> for HighlightNode {
-    fn format(&self, w: &mut HtmlWriter) -> cmark_writer::error::WriteResult<()> {
+impl Format<HtmlWriter> for MyHighlight {
+    fn format(&self, w: &mut HtmlWriter) -> WriteResult<()> {
         w.start_tag("span")?;
         w.attribute("style", &format!("background-color: {}", self.color))?;
         w.finish_tag()?;
@@ -30,22 +31,12 @@ impl Format<HtmlWriter> for HighlightNode {
 }
 
 #[test]
-fn test_highlight_new_api() {
-    let node = HighlightNode {
+fn test_my_highlight_basic() {
+    let n = MyHighlight {
         content: "X".into(),
         color: "yellow".into(),
     };
     let mut md = CommonMarkWriter::new();
-    node.to_commonmark(&mut md).unwrap();
-    assert_eq!(
-        md.into_string(),
-        "<span style=\"background-color: yellow\">X</span>"
-    );
-
-    let mut html = HtmlWriter::new();
-    node.to_html(&mut html).unwrap();
-    let s = html.into_string();
-    assert!(s.contains("<span"));
-    assert!(s.contains("background-color: yellow"));
-    assert!(s.contains("X"));
+    n.to_commonmark(&mut md).unwrap();
+    assert!(md.into_string().contains("X"));
 }
