@@ -1,12 +1,12 @@
-//! 重构后的核心trait定义
+//! 重构后的核心 trait 定义
 //!
-//! 这个模块提供了科学合理的trait层次结构，遵循SOLID原则并提供更好的关注点分离。
+//! 这个模块提供了科学合理的 trait 层次结构，遵循 SOLID 原则并提供更好的关注点分离。
 
 use crate::error::{WriteError, WriteResult};
 use ecow::EcoString;
 use std::any::Any;
 
-/// 核心节点内容trait - 只关注基本属性
+/// 核心节点内容 trait - 只关注基本属性
 pub trait NodeContent: std::fmt::Debug + Send + Sync {
     /// 是否为块级元素
     fn is_block(&self) -> bool;
@@ -16,39 +16,39 @@ pub trait NodeContent: std::fmt::Debug + Send + Sync {
         std::any::type_name::<Self>()
     }
 
-    /// 转换为Any进行类型转换
+    /// 转换为 Any 进行类型转换
     fn as_any(&self) -> &dyn Any;
 
-    /// 转换为可变Any进行类型转换
+    /// 转换为可变 Any 进行类型转换
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-/// 节点克隆和相等性trait
+/// 节点克隆和相等性 trait
 pub trait NodeClone: NodeContent {
-    /// 克隆节点到Box中
+    /// 克隆节点到 Box 中
     fn clone_box(&self) -> Box<dyn NodeContent>;
 
     /// 检查与另一个节点的相等性
     fn eq_box(&self, other: &dyn NodeContent) -> bool;
 }
 
-/// CommonMark渲染trait - 使用具体类型确保dyn兼容性
+/// CommonMark 渲染 trait - 使用具体类型确保 dyn 兼容性
 pub trait CommonMarkRenderable: NodeContent {
-    /// 渲染到CommonMark格式
+    /// 渲染到 CommonMark 格式
     fn render_commonmark(&self, writer: &mut crate::writer::CommonMarkWriter) -> WriteResult<()>;
 }
 
-/// HTML渲染trait - 使用具体类型确保dyn兼容性
+/// HTML 渲染 trait - 使用具体类型确保 dyn 兼容性
 pub trait HtmlRenderable: NodeContent {
-    /// 渲染到HTML格式
+    /// 渲染到 HTML 格式
     fn render_html(&self, writer: &mut crate::writer::HtmlWriter) -> WriteResult<()>;
 }
 
-/// 自定义节点trait - 现在dyn兼容
+/// 自定义节点 trait - 现在 dyn 兼容
 pub trait CustomNode: NodeClone + CommonMarkRenderable {
-    /// HTML渲染的默认实现
+    /// HTML 渲染的默认实现
     fn html_render(&self, writer: &mut crate::writer::HtmlWriter) -> WriteResult<()> {
-        // 使用HtmlWriter的raw_html方法
+        // 使用 HtmlWriter 的 raw_html 方法
         writer
             .raw_html(&format!(
                 "<!-- HTML rendering not implemented for {} -->",
@@ -72,7 +72,7 @@ pub trait CustomNode: NodeClone + CommonMarkRenderable {
     }
 }
 
-/// 输出写入器trait - 简化设计确保dyn兼容性
+/// 输出写入器 trait - 简化设计确保 dyn 兼容性
 pub trait Writer {
     /// 写入字符串
     fn write_str(&mut self, s: &str) -> WriteResult<()>;
@@ -86,19 +86,19 @@ pub trait Writer {
     }
 }
 
-/// 节点处理器trait
+/// 节点处理器 trait
 pub trait NodeProcessor {
     /// 检查是否可以处理该节点
     fn can_process(&self, node: &crate::ast::Node) -> bool;
 
-    /// 处理节点并写入CommonMark
+    /// 处理节点并写入 CommonMark
     fn process_commonmark(
         &self,
         writer: &mut crate::writer::CommonMarkWriter,
         node: &crate::ast::Node,
     ) -> WriteResult<()>;
 
-    /// 处理节点并写入HTML
+    /// 处理节点并写入 HTML
     fn process_html(
         &self,
         writer: &mut crate::writer::HtmlWriter,
@@ -123,7 +123,7 @@ pub trait InlineNodeProcessor: NodeProcessor {
     fn validate_inline_content(&self, node: &crate::ast::Node) -> WriteResult<()>;
 }
 
-/// 错误上下文trait
+/// 错误上下文 trait
 pub trait ErrorContext<T> {
     /// 添加上下文信息到错误
     fn with_context<S: Into<EcoString>>(self, context: S) -> Result<T, WriteError>;
@@ -135,7 +135,7 @@ pub trait ErrorContext<T> {
         S: Into<EcoString>;
 }
 
-/// 错误工厂trait
+/// 错误工厂 trait
 pub trait ErrorFactory<E> {
     /// 创建错误
     fn create_error(&self) -> E;
@@ -146,7 +146,7 @@ pub trait ErrorFactory<E> {
     }
 }
 
-/// 可配置处理器trait
+/// 可配置处理器 trait
 pub trait ConfigurableProcessor {
     /// 配置类型
     type Config;
@@ -158,7 +158,7 @@ pub trait ConfigurableProcessor {
     fn config(&self) -> &Self::Config;
 }
 
-// 为Result实现ErrorContext
+// 为 Result 实现 ErrorContext
 impl<T> ErrorContext<T> for Result<T, WriteError> {
     fn with_context<S: Into<EcoString>>(self, context: S) -> Result<T, WriteError> {
         self.map_err(|e| {
@@ -179,7 +179,7 @@ impl<T> ErrorContext<T> for Result<T, WriteError> {
     }
 }
 
-// 为CommonMarkWriter实现Writer trait
+// 为 CommonMarkWriter 实现 Writer trait
 impl Writer for crate::writer::CommonMarkWriter {
     fn write_str(&mut self, s: &str) -> WriteResult<()> {
         self.write_str(s)
@@ -190,7 +190,7 @@ impl Writer for crate::writer::CommonMarkWriter {
     }
 }
 
-// 为HtmlWriter实现Writer trait
+// 为 HtmlWriter 实现 Writer trait
 impl Writer for crate::writer::HtmlWriter {
     fn write_str(&mut self, s: &str) -> WriteResult<()> {
         self.write_str(s).map_err(WriteError::from)

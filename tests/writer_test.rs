@@ -3,13 +3,14 @@ use cmark_writer::ast::TableAlignment;
 use cmark_writer::ast::{HeadingType, HtmlAttribute, HtmlElement, ListItem, Node};
 use cmark_writer::options::WriterOptionsBuilder;
 use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::ToCommonMark;
 use cmark_writer::{CodeBlockType, WriteError, WriterOptions};
 
 #[test]
 fn test_write_text() {
     let mut writer = CommonMarkWriter::new();
     let text = Node::Text("Hello, World!".into());
-    writer.write(&text).unwrap();
+    text.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "Hello, World!");
 }
 
@@ -22,7 +23,7 @@ fn test_write_escaped_text() {
             .build(),
     );
     let text = Node::Text("Special chars: * _ [ ] < > ` \\".into());
-    writer.write(&text).unwrap();
+    text.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "Special chars: \\* \\_ \\[ \\] \\< \\> \\` \\\\"
@@ -33,7 +34,7 @@ fn test_write_escaped_text() {
 fn test_write_emphasis() {
     let mut writer = CommonMarkWriter::new();
     let emphasis = Node::Emphasis(vec![Node::Text("emphasized".into())]);
-    writer.write(&emphasis).unwrap();
+    emphasis.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "_emphasized_");
 }
 
@@ -41,7 +42,7 @@ fn test_write_emphasis() {
 fn test_write_strong() {
     let mut writer = CommonMarkWriter::new();
     let strong = Node::Strong(vec![Node::Text("bold".into())]);
-    writer.write(&strong).unwrap();
+    strong.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "**bold**");
 }
 
@@ -53,7 +54,7 @@ fn test_write_code_block() {
         content: "fn main() {\n    println!(\"Hello\");\n}".into(),
         block_type: cmark_writer::ast::CodeBlockType::Fenced,
     };
-    writer.write(&code_block).unwrap();
+    code_block.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "```rust\nfn main() {\n    println!(\"Hello\");\n}\n```\n"
@@ -68,7 +69,7 @@ fn test_write_indented_code_block() {
         content: "fn main() {\n    println!(\"Hello\");\n}".into(),
         block_type: CodeBlockType::Indented,
     };
-    writer.write(&code_block).unwrap();
+    code_block.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "    fn main() {\n        println!(\"Hello\");\n    }\n"
@@ -79,7 +80,7 @@ fn test_write_indented_code_block() {
 fn test_write_inline_code() {
     let mut writer = CommonMarkWriter::new();
     let inline_code = Node::InlineCode("let x = 42;".into());
-    writer.write(&inline_code).unwrap();
+    inline_code.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "`let x = 42;`");
 }
 
@@ -91,7 +92,7 @@ fn test_write_heading() {
         content: vec![Node::Text("Section Title".into())],
         heading_type: HeadingType::Atx, // 添加默认的 ATX 标题类型
     };
-    writer.write(&heading).unwrap();
+    heading.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "## Section Title\n");
 }
 
@@ -103,7 +104,7 @@ fn test_write_paragraph() {
         Node::Strong(vec![Node::Text("paragraph".into())]),
         Node::Text(" with formatting.".into()),
     ]);
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "This is a **paragraph** with formatting.\n"
@@ -121,7 +122,7 @@ fn test_write_unordered_list() {
             content: vec![Node::Paragraph(vec![Node::Text("Item 2".into())])],
         },
     ]);
-    writer.write(&list).unwrap();
+    list.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "- Item 1\n- Item 2\n");
 }
 
@@ -133,7 +134,7 @@ fn test_write_link() {
         title: Some("Rust Website".into()),
         content: vec![Node::Text("Rust".into())],
     };
-    writer.write(&link).unwrap();
+    link.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "[Rust](https://www.rust-lang.org \"Rust Website\")"
@@ -148,7 +149,7 @@ fn test_write_image() {
         title: Some("An image".into()),
         alt: vec![Node::Text("Alt text".into())],
     };
-    writer.write(&image).unwrap();
+    image.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "![Alt text](image.png \"An image\")");
 }
 
@@ -166,7 +167,7 @@ fn test_write_image_with_formatted_alt() {
             Node::Text(" text".into()),
         ],
     };
-    writer.write(&image).unwrap();
+    image.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "![Image with **bold** and _italic_ text](image.png \"An image with formatted alt text\")"
@@ -182,12 +183,12 @@ fn test_writer_options() {
         .build();
 
     let mut writer = CommonMarkWriter::with_options(options);
-    writer.write(&Node::HardBreak).unwrap();
+    Node::HardBreak.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "  \n");
 
     // Use default options (two spaces for line breaks)
     let mut writer = CommonMarkWriter::new();
-    writer.write(&Node::HardBreak).unwrap();
+    Node::HardBreak.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "\\\n");
 }
 
@@ -204,8 +205,8 @@ fn test_write_table() {
         ],
     };
 
-    writer.write(&table).unwrap();
-    let expected = "| Name | Age |\n| --- | --- |\n| Alice | 30 |\n| Bob | 25 |\n";
+    table.to_commonmark(&mut writer).unwrap();
+    let expected = "| Name | Age |\n| --- | --- |\n| Alice | 30 |\n| Bob | 25 |\n\n";
     assert_eq!(writer.into_string(), expected);
 }
 
@@ -236,7 +237,7 @@ fn test_table_with_block_elements_strict_mode() {
     };
 
     // In strict mode, this should fail because code blocks are block-level elements
-    let result = writer.write(&table);
+    let result = table.to_commonmark(&mut writer);
     assert!(result.is_err());
     if let Err(WriteError::InvalidStructure(msg)) = result {
         assert!(msg.contains("block-level elements"));
@@ -269,7 +270,7 @@ fn test_table_with_block_elements_soft_mode_fallback() {
     };
 
     // In soft mode, this should fallback to HTML output
-    writer.write(&table).unwrap();
+    table.to_commonmark(&mut writer).unwrap();
     let output = writer.into_string();
     println!("{}", output);
 
@@ -303,7 +304,7 @@ fn test_table_with_paragraph_in_cell_soft_mode() {
     };
 
     // Should fallback to HTML in soft mode
-    writer.write(&table).unwrap();
+    table.to_commonmark(&mut writer).unwrap();
     let output = writer.into_string();
 
     assert!(output.contains("<table>"));
@@ -327,7 +328,7 @@ fn test_table_with_only_inline_elements_no_fallback() {
     };
 
     // Should use regular markdown table syntax (no fallback needed)
-    writer.write(&table).unwrap();
+    table.to_commonmark(&mut writer).unwrap();
     let output = writer.into_string();
 
     // Should generate markdown table, not HTML
@@ -384,7 +385,7 @@ fn test_write_mixed_nested_lists() {
         },
     ]);
 
-    writer.write(&mixed_list).unwrap();
+    mixed_list.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     // Using explicit escape characters for newlines and spaces to ensure correct
@@ -423,7 +424,7 @@ fn test_inline_elements_line_breaks() {
         Node::Text(".".into()),
     ]);
 
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     // All inline elements should be on the same line without incorrect line breaks
@@ -455,7 +456,7 @@ fn test_inline_elements_line_breaks() {
     ]);
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&list).unwrap();
+    list.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     // Inline elements in list items should not have incorrect line breaks
@@ -468,28 +469,28 @@ fn test_inline_elements_line_breaks() {
 fn test_write_text_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
     let text = Node::Text("Hello\nWorld".into());
-    assert!(writer.write(&text).is_err());
+    assert!(text.to_commonmark(&mut writer).is_err());
 }
 
 #[test]
 fn test_write_inline_code_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
     let code = Node::InlineCode("let x = 1;\nlet y = 2;".into());
-    assert!(writer.write(&code).is_err());
+    assert!(code.to_commonmark(&mut writer).is_err());
 }
 
 #[test]
 fn test_write_emphasis_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
     let emph = Node::Emphasis(vec![Node::Text("foo\nbar".into())]);
-    assert!(writer.write(&emph).is_err());
+    assert!(emph.to_commonmark(&mut writer).is_err());
 }
 
 #[test]
 fn test_write_strong_with_newline_should_fail() {
     let mut writer = CommonMarkWriter::new();
     let strong = Node::Strong(vec![Node::Text("foo\nbar".into())]);
-    assert!(writer.write(&strong).is_err());
+    assert!(strong.to_commonmark(&mut writer).is_err());
 }
 
 #[test]
@@ -500,7 +501,7 @@ fn test_write_link_with_newline_should_fail() {
         title: None,
         content: vec![Node::Text("foo\nbar".into())],
     };
-    assert!(writer.write(&link).is_err());
+    assert!(link.to_commonmark(&mut writer).is_err());
 }
 
 #[test]
@@ -511,7 +512,7 @@ fn test_write_image_with_newline_should_fail() {
         title: None,
         alt: vec![Node::Text("foo\nbar".into())],
     };
-    assert!(writer.write(&image).is_err());
+    assert!(image.to_commonmark(&mut writer).is_err());
 }
 
 #[test]
@@ -523,14 +524,14 @@ fn test_write_table_cell_with_newline_should_fail() {
         alignments: vec![TableAlignment::Left],
         rows: vec![vec![Node::Text("foo\nbar".into())]],
     };
-    assert!(writer.write(&table).is_err());
+    assert!(table.to_commonmark(&mut writer).is_err());
 }
 
 // #[test]
 // fn test_write_strike() {
 //     let mut writer = CommonMarkWriter::new();
 //     let strike = Node::Emphasis(vec![Node::Text("emphasis".into())]);
-//     writer.write(&strike).unwrap();
+//     strike.to_commonmark(&mut writer).unwrap();
 //     assert_eq!(writer.into_string(), "~~emphasis~~");
 // }
 
@@ -538,7 +539,7 @@ fn test_write_table_cell_with_newline_should_fail() {
 // fn test_write_strike_with_newline_should_fail() {
 //     let mut writer = CommonMarkWriter::new();
 //     let strike = Node::Emphasis(vec![Node::Text("foo\nbar".into())]);
-//     assert!(writer.write(&strike).is_err());
+//     assert!(strike.to_commonmark(&mut writer).is_err());
 // }
 
 #[test]
@@ -554,7 +555,7 @@ fn test_write_mixed_formatting() {
         Node::Text(" text.".into()),
     ]);
 
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     let expected = "This is **bold** and _emphasized_ and _emphasis_ text.\n";
@@ -574,7 +575,7 @@ fn test_write_nested_formatting_with_strike() {
         Node::Text(".".into()),
     ]);
 
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     let expected = "This contains _emphasis with **bold** inside_.\n";
@@ -600,7 +601,7 @@ fn test_write_html_element() {
         self_closing: false,
     });
 
-    writer.write(&html_element).unwrap();
+    html_element.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "<div class=\"container\" id=\"main\">内容</div>"
@@ -626,7 +627,7 @@ fn test_write_self_closing_html_element() {
         self_closing: true,
     });
 
-    writer.write(&img).unwrap();
+    img.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "<img src=\"image.jpg\" alt=\"图片描述\" />"
@@ -658,7 +659,7 @@ fn test_nested_html_elements() {
         self_closing: false,
     });
 
-    writer.write(&nested_element).unwrap();
+    nested_element.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "<div class=\"outer\">开始 <span class=\"inner\">嵌套内容</span> 结束</div>"
@@ -675,7 +676,7 @@ fn test_html_element_with_unsafe_tag() {
         self_closing: false,
     });
 
-    let result = writer.write(&html_element);
+    let result = html_element.to_commonmark(&mut writer);
     assert!(result.is_err());
     if let Err(WriteError::InvalidHtmlTag(tag)) = result {
         assert_eq!(tag, "script<dangerous>");
@@ -701,7 +702,7 @@ fn test_html_element_with_unsafe_attribute() {
     });
 
     // 应该返回错误
-    let result = writer.write(&html_element);
+    let result = html_element.to_commonmark(&mut writer);
     assert!(result.is_err());
     if let Err(WriteError::InvalidHtmlAttribute(attr)) = result {
         assert_eq!(attr, "on<click>");
@@ -723,7 +724,7 @@ fn test_html_attribute_value_escaping() {
         self_closing: false,
     });
 
-    writer.write(&html_element).unwrap();
+    html_element.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "<div data-text=\"引号\"和&lt;标签&gt;以及&amp;符号\">内容</div>"
@@ -746,7 +747,7 @@ fn test_write_ordered_list() {
             },
         ],
     };
-    writer.write(&list).unwrap();
+    list.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "1. 第一项\n2. 第二项\n");
 }
 
@@ -770,7 +771,7 @@ fn test_write_ordered_list_with_custom_number() {
             },
         ],
     };
-    writer.write(&list).unwrap();
+    list.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "1. 第一项\n5. 从 5 开始的项\n6. 自动递增项\n"
@@ -796,7 +797,7 @@ fn test_mixed_ordered_and_unordered_items() {
             },
         ],
     };
-    writer.write(&list).unwrap();
+    list.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "10. 从 10 开始的项\n11. 无序列表项\n20. 跳跃到 20\n"
@@ -810,7 +811,7 @@ fn test_write_uri_autolink() {
         url: "https://www.example.com".into(),
         is_email: false,
     };
-    writer.write(&autolink).unwrap();
+    autolink.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "<https://www.example.com>");
 }
 
@@ -821,7 +822,7 @@ fn test_write_uri_autolink_without_scheme() {
         url: "www.example.com".into(),
         is_email: false,
     };
-    writer.write(&autolink).unwrap();
+    autolink.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "<https://www.example.com>");
 }
 
@@ -832,7 +833,7 @@ fn test_write_email_autolink() {
         url: "user@example.com".into(),
         is_email: true,
     };
-    writer.write(&autolink).unwrap();
+    autolink.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "<user@example.com>");
 }
 
@@ -843,7 +844,7 @@ fn test_autolink_with_newline_should_fail() {
         url: "https://example.com\nwith-newline".into(),
         is_email: false,
     };
-    assert!(writer.write(&autolink).is_err());
+    assert!(autolink.to_commonmark(&mut writer).is_err());
 }
 
 #[test]
@@ -863,7 +864,7 @@ fn test_autolink_in_paragraph() {
         Node::Text(" for more information.".into()),
     ]);
 
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "Visit <https://www.example.com> or contact <user@example.com> for more information.\n"
@@ -878,7 +879,7 @@ fn test_write_link_reference_definition() {
         destination: "/url".into(),
         title: Some("title".into()),
     };
-    writer.write(&link_ref_def).unwrap();
+    link_ref_def.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "[foo]: /url \"title\"\n");
 }
 
@@ -890,7 +891,7 @@ fn test_write_link_reference_definition_no_title() {
         destination: "https://example.com".into(),
         title: None,
     };
-    writer.write(&link_ref_def).unwrap();
+    link_ref_def.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "[bar]: https://example.com\n");
 }
 
@@ -901,7 +902,7 @@ fn test_write_reference_link() {
         label: "foo".into(),
         content: vec![Node::Text("Link text".into())],
     };
-    writer.write(&ref_link).unwrap();
+    ref_link.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "[Link text][foo]");
 }
 
@@ -913,7 +914,7 @@ fn test_write_shortcut_reference_link() {
         label: "foo".into(),
         content: vec![Node::Text("foo".into())],
     };
-    writer.write(&ref_link).unwrap();
+    ref_link.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "[foo]");
 
     // Empty content also produces a shortcut reference
@@ -922,7 +923,7 @@ fn test_write_shortcut_reference_link() {
         label: "bar".into(),
         content: vec![],
     };
-    writer.write(&ref_link).unwrap();
+    ref_link.to_commonmark(&mut writer).unwrap();
     assert_eq!(writer.into_string(), "[bar]");
 }
 
@@ -938,7 +939,7 @@ fn test_reference_link_in_paragraph() {
         Node::Text(" for more information.".into()),
     ]);
 
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "See [this example][example] for more information.\n"
@@ -972,7 +973,7 @@ fn test_document_with_reference_links() {
         ]),
     ]);
 
-    writer.write(&doc).unwrap();
+    doc.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
         "[example]: /example \"Example Page\"
@@ -1028,7 +1029,7 @@ fn test_nested_leaf_blocks_with_indentation() {
         },
     ]);
 
-    writer.write(&list).unwrap();
+    list.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     let expected = r#"- 普通段落
@@ -1068,7 +1069,7 @@ fn test_nested_blockquote_with_indentation() {
         Node::Paragraph(vec![Node::Text("外部引用第二段落".into())]),
     ]);
 
-    writer.write(&blockquote).unwrap();
+    blockquote.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     let expected = "> 外部引用第一段落
@@ -1116,7 +1117,7 @@ fn test_nested_mixed_containers() {
         Node::Paragraph(vec![Node::Text("引用块的最后一段".into())]),
     ]);
 
-    writer.write(&mixed_containers).unwrap();
+    mixed_containers.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     let expected = "> 引用块中的段落

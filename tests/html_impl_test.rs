@@ -1,4 +1,4 @@
-use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node};
+use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node, ToHtml};
 
 #[test]
 fn test_html_writer_options() {
@@ -17,7 +17,7 @@ fn test_html_writer_options() {
         content: "fn main() {}".into(),
         block_type: Default::default(),
     };
-    writer.write_node(&code_block).unwrap();
+    code_block.to_html(&mut writer).unwrap();
     let output = writer.into_string();
     assert!(output.contains("class=\"language-rust\""));
 }

@@ -1,5 +1,6 @@
 use cmark_writer::error::WriteResult;
-use cmark_writer::{CommonMarkWriter, Format, HtmlWriter, MultiFormat, ToCommonMark};
+use cmark_writer::ToCommonMark;
+use cmark_writer::{CommonMarkWriter, Format, HtmlWriter, MultiFormat};
 
 #[derive(Debug, Clone, PartialEq)]
 struct SimpleNote {

@@ -1,5 +1,6 @@
 use cmark_writer::{
-    CommonMarkWriter, HtmlAttribute, HtmlElement, HtmlWriterOptions, Node, WriterOptions,
+    CommonMarkWriter, HtmlAttribute, HtmlElement, HtmlWriterOptions, Node, ToCommonMark,
+    WriterOptions,
 };
 
 #[test]
@@ -33,7 +34,7 @@ fn test_custom_html_options_in_commonmark_writer() {
     ])]);
 
     // 应该能够成功写入，因为我们设置了非严格模式
-    writer.write(&document).unwrap();
+    document.to_commonmark(&mut writer).unwrap();
     let output = writer.into_string();
 
     // 验证输出包含自定义标签
@@ -63,7 +64,7 @@ fn test_default_html_options_derivation() {
 
     let document = Node::Document(vec![Node::HtmlElement(html_element)]);
 
-    writer.write(&document).unwrap();
+    document.to_commonmark(&mut writer).unwrap();
     let output = writer.into_string();
 
     // 验证标准 HTML 元素被正确渲染
@@ -97,7 +98,7 @@ fn test_code_block_prefix_customization() {
 
     let document = Node::Document(vec![Node::HtmlElement(code_element)]);
 
-    writer.write(&document).unwrap();
+    document.to_commonmark(&mut writer).unwrap();
     let output = writer.into_string();
 
     // 验证自定义前缀被使用
@@ -107,6 +108,7 @@ fn test_code_block_prefix_customization() {
 #[test]
 fn test_html_options_with_builder() {
     // 测试使用构建器模式设置 HTML 选项
+    use cmark_writer::ToCommonMark;
     use cmark_writer::WriterOptionsBuilder;
 
     let options = WriterOptionsBuilder::new()
@@ -128,7 +130,9 @@ fn test_html_options_with_builder() {
         self_closing: false,
     };
 
-    writer.write(&Node::HtmlElement(custom_element)).unwrap();
+    Node::HtmlElement(custom_element)
+        .to_commonmark(&mut writer)
+        .unwrap();
     let output = writer.into_string();
 
     assert!(output.contains("<mark>marked text</mark>"));
@@ -157,7 +161,8 @@ fn test_strict_mode_difference() {
 
     // 严格模式下，自定义标签可能会被处理（取决于实现）
     // 非严格模式下，应该能正常处理
-    let result_non_strict = non_strict_writer.write(&Node::HtmlElement(custom_element.clone()));
+    let result_non_strict =
+        Node::HtmlElement(custom_element.clone()).to_commonmark(&mut non_strict_writer);
     assert!(result_non_strict.is_ok());
 
     let output = non_strict_writer.into_string();

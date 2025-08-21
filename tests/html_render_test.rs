@@ -4,6 +4,7 @@ mod tests {
     #[cfg(feature = "gfm")]
     use cmark_writer::ast::{TableAlignment, TaskListStatus};
     use cmark_writer::writer::{HtmlWriteResult, HtmlWriter, HtmlWriterOptions};
+    use cmark_writer::ToHtml;
     use ecow::EcoString;
     use log::{LevelFilter, Log};
     use std::sync::Once;
@@ -53,7 +54,10 @@ mod tests {
         // Create HtmlWriter with the provided options
         let mut html_writer = HtmlWriter::with_options(options.clone());
         // Write the node to the writer
-        html_writer.write_node(node)?;
+        match node.to_html(&mut html_writer) {
+            Ok(()) => {}
+            Err(e) => return Err(cmark_writer::HtmlWriteError::CustomNodeError(e.to_string())),
+        }
         // Convert the writer to a string and return it
         let html = html_writer.into_string();
         Ok(html)

@@ -2,10 +2,7 @@
 #![deny(missing_docs)]
 
 // AST related exports
-pub use crate::ast::{
-    CodeBlockType, GenericCustomNode, HeadingType, HtmlAttribute, HtmlElement, ListItem, Node,
-    NodeKind, TextCustomNode,
-};
+pub use crate::ast::{CodeBlockType, HeadingType, HtmlAttribute, HtmlElement, ListItem, Node};
 
 // Error types
 pub use crate::error::{CodedError, StructureError, WriteError, WriteResult};

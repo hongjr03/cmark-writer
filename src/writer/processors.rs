@@ -99,7 +99,7 @@ impl NodeProcessor for EnhancedBlockProcessor {
                     if i > 0 {
                         writer.write_str("\n\n")?;
                     }
-                    writer.write(child)?;
+                    writer.write_node_internal(child)?;
                 }
                 Ok(())
             }
@@ -146,7 +146,7 @@ impl NodeProcessor for EnhancedBlockProcessor {
     }
 
     fn process_html(&self, writer: &mut crate::writer::HtmlWriter, node: &Node) -> WriteResult<()> {
-        writer.write_node(node).map_err(WriteError::from)
+        writer.write_node_internal(node).map_err(WriteError::from)
     }
 
     fn priority(&self) -> u32 {
@@ -255,7 +255,7 @@ impl NodeProcessor for EnhancedInlineProcessor {
     }
 
     fn process_html(&self, writer: &mut crate::writer::HtmlWriter, node: &Node) -> WriteResult<()> {
-        writer.write_node(node).map_err(WriteError::from)
+        writer.write_node_internal(node).map_err(WriteError::from)
     }
 
     fn priority(&self) -> u32 {

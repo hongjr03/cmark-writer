@@ -1,11 +1,7 @@
 use cmark_writer::ast::HeadingType;
 use cmark_writer::coded_error;
 use cmark_writer::structure_error;
-use cmark_writer::CommonMarkWriter;
-use cmark_writer::Node;
-use cmark_writer::WriteError;
-use cmark_writer::WriteResult;
-use cmark_writer::WriterOptions;
+use cmark_writer::{CommonMarkWriter, Node, ToCommonMark, WriteError, WriteResult, WriterOptions};
 use std::fmt::{self, Display};
 
 #[test]
@@ -18,7 +14,7 @@ fn test_invalid_heading_level() {
         content: vec![Node::Text("Invalid Heading".into())],
         heading_type: HeadingType::Atx,
     };
-    let result = writer.write(&invalid_heading_0);
+    let result = invalid_heading_0.to_commonmark(&mut writer);
     assert!(result.is_err());
 
     if let Err(WriteError::InvalidHeadingLevel(level)) = result {
@@ -34,7 +30,7 @@ fn test_invalid_heading_level() {
         content: vec![Node::Text("Invalid Heading".into())],
         heading_type: HeadingType::Atx,
     };
-    let result = writer.write(&invalid_heading_7);
+    let result = invalid_heading_7.to_commonmark(&mut writer);
     assert!(result.is_err());
 
     if let Err(WriteError::InvalidHeadingLevel(level)) = result {
@@ -50,7 +46,7 @@ fn test_invalid_heading_level() {
         content: vec![Node::Text("Valid Heading".into())],
         heading_type: HeadingType::Atx,
     };
-    assert!(writer.write(&valid_heading).is_ok());
+    assert!(valid_heading.to_commonmark(&mut writer).is_ok());
 }
 
 #[test]
@@ -59,7 +55,7 @@ fn test_newline_in_inline_element() {
 
     // Test newline in text
     let text_with_newline = Node::Text("Line 1\nLine 2".into());
-    let result = writer.write(&text_with_newline);
+    let result = text_with_newline.to_commonmark(&mut writer);
     assert!(result.is_err());
 
     match result {
@@ -72,19 +68,19 @@ fn test_newline_in_inline_element() {
     // Test newline in emphasis
     let mut writer = CommonMarkWriter::new();
     let emphasis_with_newline = Node::Emphasis(vec![Node::Text("Line 1\nLine 2".into())]);
-    let result = writer.write(&emphasis_with_newline);
+    let result = emphasis_with_newline.to_commonmark(&mut writer);
     assert!(result.is_err());
 
     // Test newline in strong
     let mut writer = CommonMarkWriter::new();
     let strong_with_newline = Node::Strong(vec![Node::Text("Line 1\nLine 2".into())]);
-    let result = writer.write(&strong_with_newline);
+    let result = strong_with_newline.to_commonmark(&mut writer);
     assert!(result.is_err());
 
     // Test newline in inline code
     let mut writer = CommonMarkWriter::new();
     let code_with_newline = Node::InlineCode("Line 1\nLine 2".into());
-    let result = writer.write(&code_with_newline);
+    let result = code_with_newline.to_commonmark(&mut writer);
     assert!(result.is_err());
 }
 
@@ -173,6 +169,7 @@ fn test_write_result_alias() {
 #[test]
 fn test_custom_errors() {
     use cmark_writer::error::WriteError;
+
     use std::error::Error;
 
     let custom_err = WriteError::custom("这是一个自定义错误");
@@ -298,7 +295,7 @@ fn test_invalid_heading_level_strict() {
         content: vec![Node::Text("Test".into())],
         heading_type: HeadingType::Atx,
     };
-    match writer.write(&node) {
+    match node.to_commonmark(&mut writer) {
         Err(WriteError::InvalidHeadingLevel(level)) => assert_eq!(level, 0),
         _ => panic!("Expected InvalidHeadingLevel error"),
     }
@@ -317,7 +314,7 @@ fn test_invalid_heading_level_non_strict() {
         content: vec![Node::Text("Test".into())],
         heading_type: HeadingType::Atx,
     };
-    assert!(writer.write(&node).is_ok());
+    assert!(node.to_commonmark(&mut writer).is_ok());
     // In non-strict, level 0 should be clamped to 1.
     assert_eq!(writer.into_string(), "# Test\n");
     // Manually check stderr for log: "Invalid heading level: 0. Corrected to 1..."
@@ -336,7 +333,7 @@ fn test_invalid_heading_level_7_non_strict() {
         content: vec![Node::Text("Test".into())],
         heading_type: HeadingType::Atx,
     };
-    assert!(writer.write(&node).is_ok());
+    assert!(node.to_commonmark(&mut writer).is_ok());
     // In non-strict, level 7 should be clamped to 6.
     assert_eq!(writer.into_string(), "###### Test\n");
     // Manually check stderr for log: "Invalid heading level: 7. Corrected to 6..."
@@ -355,7 +352,7 @@ fn test_newline_in_link_text_strict() {
         title: None,
         content: vec![Node::Text("Link\nText".into())], // Newline in link text
     };
-    match writer.write(&node) {
+    match node.to_commonmark(&mut writer) {
         Err(WriteError::NewlineInInlineElement(context)) => assert_eq!(context, "Link content"),
         _ => panic!("Expected NewlineInInlineElement error for link text"),
     }
@@ -374,7 +371,7 @@ fn test_newline_in_link_text_non_strict() {
         title: None,
         content: vec![Node::Text("Link\nText".into())], // Newline in link text
     };
-    assert!(writer.write(&node).is_ok());
+    assert!(node.to_commonmark(&mut writer).is_ok());
     // Output will contain the newline as per current non-strict behavior
     assert_eq!(writer.into_string(), "[Link\nText](http://example.com)");
     // Manually check stderr for log: "Newline character found in inline element 'Link Text'..."
@@ -392,7 +389,7 @@ fn test_newline_in_link_text_non_strict() {
 //     let options = WriterOptions { strict: true, ..Default::default() };
 //     let mut writer = CommonMarkWriter::with_options(options);
 //     let node = Node::TestOnlyUnsupported; // Hypothetical
-//     match writer.write(&node) {
+//     match node.to_commonmark(&mut writer) {
 //         Err(WriteError::UnsupportedNodeType) => { /* Expected */ }
 //         _ => panic!("Expected UnsupportedNodeType error"),
 //     }
@@ -404,7 +401,7 @@ fn test_newline_in_link_text_non_strict() {
 //     let options = WriterOptions { strict: false, ..Default::default() };
 //     let mut writer = CommonMarkWriter::with_options(options);
 //     let node = Node::TestOnlyUnsupported; // Hypothetical
-//     assert!(writer.write(&node).is_ok());
+//     assert!(node.to_commonmark(&mut writer).is_ok());
 //     assert_eq!(writer.into_string(), ""); // Or placeholder if you decide to write one
 //     // Manually check stderr for log: "Unsupported node type encountered and skipped..."
 // }

@@ -1,5 +1,6 @@
 use cmark_writer::ast::{HeadingType, Node};
 use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::ToCommonMark;
 
 #[test]
 fn test_setext_heading() {
@@ -11,7 +12,7 @@ fn test_setext_heading() {
     };
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&heading_level1).unwrap();
+    heading_level1.to_commonmark(&mut writer).unwrap();
 
     // Setext 一级标题应该使用 = 字符作为下划线
     let expected_level1 = "这是一级 Setext 标题\n===\n";
@@ -25,7 +26,7 @@ fn test_setext_heading() {
     };
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&heading_level2).unwrap();
+    heading_level2.to_commonmark(&mut writer).unwrap();
 
     // Setext 二级标题应该使用 - 字符作为下划线
     let expected_level2 = "这是二级 Setext 标题\n---\n";
@@ -48,7 +49,7 @@ fn test_complex_setext_heading() {
     };
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&complex_heading).unwrap();
+    complex_heading.to_commonmark(&mut writer).unwrap();
 
     let expected = "带有 _强调_ 和 **加粗** 的 Setext 标题\n===\n";
     assert_eq!(writer.into_string(), expected);
@@ -64,7 +65,7 @@ fn test_compare_atx_and_setext() {
     };
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&atx_heading).unwrap();
+    atx_heading.to_commonmark(&mut writer).unwrap();
     let atx_result = writer.into_string();
 
     // Setext 标题
@@ -75,7 +76,7 @@ fn test_compare_atx_and_setext() {
     };
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&setext_heading).unwrap();
+    setext_heading.to_commonmark(&mut writer).unwrap();
     let setext_result = writer.into_string();
 
     // 验证两种形式确实不同
@@ -110,7 +111,7 @@ fn test_setext_heading_in_document() {
     ]);
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&document).unwrap();
+    document.to_commonmark(&mut writer).unwrap();
 
     let expected = "\
 # 文档标题 (ATX)

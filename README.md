@@ -13,6 +13,7 @@ A CommonMark writer implementation in Rust.
 ```rust
 use cmark_writer::ast::{Node, ListItem};
 use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::ToCommonMark;
 
 // Create a document
 let document = Node::Document(vec![
@@ -26,7 +27,7 @@ let document = Node::Document(vec![
 
 // Render to CommonMark
 let mut writer = CommonMarkWriter::new();
-writer.write(&document).expect("Failed to write document");
+document.to_commonmark(&mut writer).expect("Failed to write document");
 let markdown = writer.into_string();
 
 println!("{}", markdown);
@@ -92,7 +93,7 @@ GFM Support:
 The library provides dedicated HTML writing capabilities through the `HtmlWriter` class:
 
 ```rust
-use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node};
+use cmark_writer::{HtmlWriter, HtmlWriterOptions, Node, ToHtml};
 
 // Create HTML writer with custom options
 let options = HtmlWriterOptions {
@@ -108,7 +109,7 @@ let mut writer = HtmlWriter::with_options(options);
 
 // Write some nodes
 let paragraph = Node::Paragraph(vec![Node::Text("Hello HTML".into())]);
-writer.write_node(&paragraph).unwrap();
+paragraph.to_html(&mut writer).unwrap();
 
 // Get resulting HTML
 let html = writer.into_string();
@@ -223,6 +224,49 @@ This approach provides:
 - Type safety and clear format boundaries
 - Easy extensibility for new formats
 - Consistent, idiomatic Rust traits across the API
+
+## Custom Error Handling
+
+The library provides convenient macros for creating structured custom errors:
+
+```rust
+use cmark_writer::{coded_error, structure_error, WriteError};
+
+// Structure error - for invalid document structure
+#[structure_error(format = "表格列数不匹配：{}")]
+struct TableColumnMismatchError(pub &'static str);
+
+// Coded error - for custom errors with error codes
+#[coded_error]
+struct MarkdownSyntaxError(pub String, pub String);
+
+// Usage examples
+fn validate_table() -> Result<(), WriteError> {
+    // Create structure error
+    let err = TableColumnMismatchError("第 3 行有 4 列，但表头只有 3 列").into_error();
+    // Result: "Invalid structure: 表格列数不匹配：第 3 行有 4 列，但表头只有 3 列"
+    
+    // Create coded error
+    let err = MarkdownSyntaxError(
+        "缺少闭合代码块标记".into(), 
+        "CODE_BLOCK_UNCLOSED".into()
+    ).into_error();
+    // Result: "Custom error [CODE_BLOCK_UNCLOSED]: 缺少闭合代码块标记"
+    
+    Ok(())
+}
+
+// Convert to standard WriteError
+let write_err: WriteError = TableColumnMismatchError("错误示例").into();
+assert!(matches!(write_err, WriteError::InvalidStructure(_)));
+```
+
+The error macros provide:
+
+- **`#[structure_error]`**: For document structure validation errors
+- **`#[coded_error]`**: For custom errors with error codes and messages
+- Automatic conversion to `WriteError` types
+- Consistent error formatting and display
 
 ## Development
 

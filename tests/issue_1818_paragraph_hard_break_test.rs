@@ -3,6 +3,7 @@
 
 use cmark_writer::ast::Node;
 use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::ToCommonMark;
 
 #[test]
 fn test_paragraph_trailing_hard_breaks_removed() {
@@ -12,8 +13,10 @@ fn test_paragraph_trailing_hard_breaks_removed() {
     ]);
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
+
+    eprintln!("Result: {}", result);
 
     assert!(!result.ends_with("  \n"));
     assert!(!result.ends_with("\\\n"));
@@ -33,7 +36,7 @@ fn test_paragraph_multiple_trailing_hard_breaks_removed() {
     ]);
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     assert!(!result.ends_with("  \n"));
@@ -55,7 +58,7 @@ fn test_paragraph_internal_hard_breaks_preserved() {
     ]);
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     assert!(result.contains("  \n") || result.contains("\\\n"));
@@ -74,8 +77,10 @@ fn test_paragraph_only_hard_breaks() {
     ]);
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&paragraph).unwrap();
+    paragraph.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
+
+    eprintln!("Result: {}", result);
 
     assert!(result == "\n");
     assert!(!result.contains("  \n"));
@@ -94,7 +99,7 @@ fn test_document_with_paragraphs_trailing_hard_breaks() {
     ]);
 
     let mut writer = CommonMarkWriter::new();
-    writer.write(&document).unwrap();
+    document.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
     let lines: Vec<&str> = result.lines().collect();
