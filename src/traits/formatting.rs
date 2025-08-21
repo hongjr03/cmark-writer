@@ -130,7 +130,18 @@ pub trait MultiFormat: ToCommonMark {
                 ))
             }
         } else {
-            Err(crate::error::WriteError::custom("Unsupported writer type"))
+    fn render_multi(&self, writer: &mut MultiWriter) -> WriteResult<()> {
+        match writer {
+            MultiWriter::CommonMark(w) => self.to_commonmark(w),
+            MultiWriter::Html(w) => {
+                if self.supports_html() {
+                    self.html_format(w)
+                } else {
+                    Err(crate::error::WriteError::custom(
+                        "HTML format not supported for this node type",
+                    ))
+                }
+            }
         }
     }
 }
