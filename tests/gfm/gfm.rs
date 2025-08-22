@@ -8,7 +8,6 @@
 //! - Extended autolinks
 //! - HTML tag filtering
 
-#[cfg(feature = "gfm")]
 mod gfm_tests {
     use cmark_writer::ast::{HtmlAttribute, HtmlElement};
     use cmark_writer::ast::{ListItem, Node, TableAlignment, TaskListStatus};
