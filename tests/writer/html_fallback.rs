@@ -46,7 +46,7 @@ fn table_with_block_elements_and_alignments_soft_mode_falls_back_to_html() {
         .expect("fallback should succeed");
     let output = writer.into_string();
 
-    eprintln!("{}", output);
+    // eprintln!("{}", output);
 
     // Should be HTML table, not markdown pipe table
     assert!(output.contains("<table>"));

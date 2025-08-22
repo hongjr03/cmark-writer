@@ -8,6 +8,10 @@
 //! - Extended autolinks
 //! - HTML tag filtering
 
+mod formatting;
+mod tables;
+mod tasks;
+
 mod gfm_tests {
     use crate::support::cmark::writer_with_gfm;
     use cmark_writer::ast::{HtmlAttribute, HtmlElement};

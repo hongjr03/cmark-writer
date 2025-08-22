@@ -16,7 +16,7 @@ fn test_paragraph_trailing_hard_breaks_removed() {
     paragraph.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
-    eprintln!("Result: {}", result);
+    // eprintln!("Result: {}", result);
 
     assert!(!result.ends_with("  \n"));
     assert!(!result.ends_with("\\\n"));
@@ -80,7 +80,7 @@ fn test_paragraph_only_hard_breaks() {
     paragraph.to_commonmark(&mut writer).unwrap();
     let result = writer.into_string();
 
-    eprintln!("Result: {}", result);
+    // eprintln!("Result: {}", result);
 
     assert!(result == "\n");
     assert!(!result.contains("  \n"));

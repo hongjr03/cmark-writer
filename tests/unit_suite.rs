@@ -2,5 +2,7 @@
 
 mod ast;
 mod error;
+mod options;
 mod support;
+mod traits;
 mod writer;
