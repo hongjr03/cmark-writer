@@ -3,76 +3,16 @@ mod tests {
     use cmark_writer::ast::{HtmlElement, ListItem, Node};
     #[cfg(feature = "gfm")]
     use cmark_writer::ast::{TableAlignment, TaskListStatus};
-    use cmark_writer::writer::{HtmlWriteResult, HtmlWriter, HtmlWriterOptions};
-    use cmark_writer::ToHtml;
+    use cmark_writer::writer::HtmlWriterOptions;
     use ecow::EcoString;
-    use log::{LevelFilter, Log};
-    use std::sync::Once;
+    use log::LevelFilter;
+    use crate::support::{html as support_html, logger};
 
-    static INIT: Once = Once::new();
+    fn setup_logger() { logger::init(LevelFilter::Warn); }
 
-    fn setup_logger() {
-        INIT.call_once(|| {
-            struct TestLogger;
-            impl Log for TestLogger {
-                fn enabled(&self, metadata: &log::Metadata) -> bool {
-                    metadata.level() <= LevelFilter::Warn
-                }
-
-                fn log(&self, record: &log::Record) {
-                    if self.enabled(record.metadata()) {
-                        let color_code = match record.level() {
-                            log::Level::Error => "\x1b[31m", // Red
-                            log::Level::Warn => "\x1b[33m",  // Yellow
-                            log::Level::Info => "\x1b[32m",  // Green
-                            log::Level::Debug => "\x1b[34m", // Blue
-                            log::Level::Trace => "\x1b[90m", // Gray
-                        };
-                        let reset = "\x1b[0m";
-                        println!(
-                            "{}[{}]{} {}: {}",
-                            color_code,
-                            record.level(),
-                            reset,
-                            record.target(),
-                            record.args()
-                        );
-                    }
-                }
-
-                fn flush(&self) {}
-            }
-
-            log::set_boxed_logger(Box::new(TestLogger))
-                .map(|()| log::set_max_level(LevelFilter::Warn))
-                .expect("Failed to initialize logger");
-        });
-    }
-
-    // Helper function to render a node to string with given options
-    fn render_node_to_html(node: &Node, options: &HtmlWriterOptions) -> HtmlWriteResult<EcoString> {
-        // Create HtmlWriter with the provided options
-        let mut html_writer = HtmlWriter::with_options(options.clone());
-        // Write the node to the writer
-        match node.to_html(&mut html_writer) {
-            Ok(()) => {}
-            Err(e) => return Err(cmark_writer::HtmlWriteError::CustomNodeError(e.to_string())),
-        }
-        // Convert the writer to a string and return it
-        let html = html_writer.into_string();
-        Ok(html)
-    }
-
-    // Helper function to render a node to string with default options
-    fn render_node_to_html_default(node: &Node) -> HtmlWriteResult<EcoString> {
-        render_node_to_html(
-            node,
-            #[cfg(feature = "gfm")]
-            &HtmlWriterOptions::default().with_gfm_enabled(true),
-            #[cfg(not(feature = "gfm"))]
-            &HtmlWriterOptions::default(),
-        )
-    }
+    // Helper function wrappers to shared support helpers
+    fn render_node_to_html(node: &Node, options: &HtmlWriterOptions) -> cmark_writer::writer::HtmlWriteResult<EcoString> { support_html::render_node(node, options) }
+    fn render_node_to_html_default(node: &Node) -> cmark_writer::writer::HtmlWriteResult<EcoString> { support_html::render_node_default(node) }
 
     #[test]
     fn test_paragraph_and_text() {

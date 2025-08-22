@@ -1,5 +1,5 @@
 use cmark_writer::error::WriteResult;
-use cmark_writer::{CommonMarkWriter, Format, HtmlWriter, ToCommonMark, ToHtml};
+use cmark_writer::{CommonMarkWriter, Format, HtmlWriter, ToCommonMark};
 use ecow::EcoString;
 
 #[derive(Debug, Clone, PartialEq)]
