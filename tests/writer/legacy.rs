@@ -976,12 +976,7 @@ fn test_document_with_reference_links() {
     doc.to_commonmark(&mut writer).unwrap();
     assert_eq!(
         writer.into_string(),
-        "[example]: /example \"Example Page\"
-
-See [this example][example].
-
-Or just click [example].
-"
+        "[example]: /example \"Example Page\"\n\nSee [this example][example].\n\nOr just click [example].\n"
     );
 }
 

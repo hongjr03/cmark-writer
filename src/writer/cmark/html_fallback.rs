@@ -14,9 +14,22 @@ impl CommonMarkWriter {
         headers: &[Node],
         rows: &[Vec<Node>],
     ) -> WriteResult<()> {
-        use crate::writer::html::HtmlWriter;
+        use crate::writer::html::{HtmlWriter, HtmlWriterOptions};
 
-        let mut html_writer = HtmlWriter::new();
+        let html_options = if let Some(ref custom_options) = self.options.html_writer_options {
+            custom_options.clone()
+        } else {
+            HtmlWriterOptions {
+                strict: self.options.strict,
+                code_block_language_class_prefix: Some("language-".into()),
+                #[cfg(feature = "gfm")]
+                enable_gfm: self.options.enable_gfm,
+                #[cfg(feature = "gfm")]
+                gfm_disallowed_html_tags: self.options.gfm_disallowed_html_tags.clone(),
+            }
+        };
+
+        let mut html_writer = HtmlWriter::with_options(html_options);
 
         // Create table node for HTML writer
         let table_node = Node::Table {
@@ -44,9 +57,22 @@ impl CommonMarkWriter {
         alignments: &[TableAlignment],
         rows: &[Vec<Node>],
     ) -> WriteResult<()> {
-        use crate::writer::html::HtmlWriter;
+        use crate::writer::html::{HtmlWriter, HtmlWriterOptions};
 
-        let mut html_writer = HtmlWriter::new();
+        let html_options = if let Some(ref custom_options) = self.options.html_writer_options {
+            custom_options.clone()
+        } else {
+            HtmlWriterOptions {
+                strict: self.options.strict,
+                code_block_language_class_prefix: Some("language-".into()),
+                #[cfg(feature = "gfm")]
+                enable_gfm: self.options.enable_gfm,
+                #[cfg(feature = "gfm")]
+                gfm_disallowed_html_tags: self.options.gfm_disallowed_html_tags.clone(),
+            }
+        };
+
+        let mut html_writer = HtmlWriter::with_options(html_options);
 
         // Create table node for HTML writer
         let table_node = Node::Table {

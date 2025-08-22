@@ -8,18 +8,26 @@
 //! - Extended autolinks
 //! - HTML tag filtering
 
-#[cfg(feature = "gfm")]
+mod formatting;
+mod tables;
+mod tasks;
+
 mod gfm_tests {
+    use crate::support::cmark::writer_with_gfm;
     use cmark_writer::ast::{HtmlAttribute, HtmlElement};
     use cmark_writer::ast::{ListItem, Node, TableAlignment, TaskListStatus};
-    use cmark_writer::options::WriterOptionsBuilder;
     use cmark_writer::writer::CommonMarkWriter;
     use cmark_writer::ToCommonMark;
+    use cmark_writer::WriterOptionsBuilder;
 
     /// Helper function to create a writer with GFM features enabled
+    #[cfg(feature = "gfm")]
     fn create_gfm_writer() -> CommonMarkWriter {
-        let options = WriterOptionsBuilder::new().enable_gfm().build();
-        CommonMarkWriter::with_options(options)
+        writer_with_gfm()
+    }
+    #[cfg(not(feature = "gfm"))]
+    fn create_gfm_writer() -> CommonMarkWriter {
+        CommonMarkWriter::default()
     }
 
     #[test]
