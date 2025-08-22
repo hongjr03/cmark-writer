@@ -4,10 +4,12 @@ pub mod logger {
     use log::{LevelFilter, Log};
     use std::sync::Once;
 
+    #[allow(dead_code)]
     static INIT: Once = Once::new();
 
     /// Initialize a simple stdout logger once for tests.
     /// Safe to call multiple times; only first call takes effect.
+    #[allow(dead_code)]
     pub fn init(level: LevelFilter) {
         INIT.call_once(|| {
             struct TestLogger;
@@ -40,8 +42,7 @@ pub mod logger {
                 fn flush(&self) {}
             }
 
-            let _ = log::set_boxed_logger(Box::new(TestLogger))
-                .map(|()| log::set_max_level(level));
+            let _ = log::set_boxed_logger(Box::new(TestLogger)).map(|()| log::set_max_level(level));
         });
     }
 }
@@ -52,6 +53,7 @@ pub mod cmark {
 
     /// Create a CommonMark writer with GFM features enabled.
     #[cfg(feature = "gfm")]
+    #[allow(dead_code)]
     pub fn writer_with_gfm() -> CommonMarkWriter {
         let options = WriterOptionsBuilder::new().enable_gfm().build();
         CommonMarkWriter::with_options(options)
@@ -65,6 +67,7 @@ pub mod html {
     use ecow::EcoString;
 
     /// Render a node to HTML using provided options.
+    #[allow(dead_code)]
     pub fn render_node(node: &Node, options: &HtmlWriterOptions) -> HtmlWriteResult<EcoString> {
         let mut html_writer = HtmlWriter::with_options(options.clone());
         match node.to_html(&mut html_writer) {
@@ -75,6 +78,7 @@ pub mod html {
     }
 
     /// Render a node to HTML using default options.
+    #[allow(dead_code)]
     pub fn render_node_default(node: &Node) -> HtmlWriteResult<EcoString> {
         render_node(
             node,

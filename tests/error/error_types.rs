@@ -1,15 +1,23 @@
-use cmark_writer::{CommonMarkWriter, Node, ToCommonMark, WriteError};
 use cmark_writer::ast::HeadingType;
+use cmark_writer::{CommonMarkWriter, Node, ToCommonMark, WriteError};
 
 #[test]
 fn invalid_heading_levels() {
     let mut w = CommonMarkWriter::new();
-    let h0 = Node::Heading { level: 0, content: vec![Node::Text("Invalid".into())], heading_type: HeadingType::Atx };
+    let h0 = Node::Heading {
+        level: 0,
+        content: vec![Node::Text("Invalid".into())],
+        heading_type: HeadingType::Atx,
+    };
     let e = h0.to_commonmark(&mut w).unwrap_err();
     assert!(matches!(e, WriteError::InvalidHeadingLevel(0)));
 
     let mut w = CommonMarkWriter::new();
-    let h7 = Node::Heading { level: 7, content: vec![Node::Text("Invalid".into())], heading_type: HeadingType::Atx };
+    let h7 = Node::Heading {
+        level: 7,
+        content: vec![Node::Text("Invalid".into())],
+        heading_type: HeadingType::Atx,
+    };
     let e = h7.to_commonmark(&mut w).unwrap_err();
     assert!(matches!(e, WriteError::InvalidHeadingLevel(7)));
 }
@@ -18,7 +26,10 @@ fn invalid_heading_levels() {
 fn newline_in_inline_elements() {
     let mut w = CommonMarkWriter::new();
     let t = Node::Text("a\nb".into());
-    assert!(matches!(t.to_commonmark(&mut w), Err(WriteError::NewlineInInlineElement(_))));
+    assert!(matches!(
+        t.to_commonmark(&mut w),
+        Err(WriteError::NewlineInInlineElement(_))
+    ));
 }
 
 #[test]

@@ -1,18 +1,29 @@
 #[cfg(test)]
 mod tests {
+    use crate::support::{html as support_html, logger};
     use cmark_writer::ast::{HtmlElement, ListItem, Node};
     #[cfg(feature = "gfm")]
     use cmark_writer::ast::{TableAlignment, TaskListStatus};
     use cmark_writer::writer::HtmlWriterOptions;
     use ecow::EcoString;
     use log::LevelFilter;
-    use crate::support::{html as support_html, logger};
 
-    fn setup_logger() { logger::init(LevelFilter::Warn); }
+    fn setup_logger() {
+        logger::init(LevelFilter::Warn);
+    }
 
     // Helper function wrappers to shared support helpers
-    fn render_node_to_html(node: &Node, options: &HtmlWriterOptions) -> cmark_writer::writer::HtmlWriteResult<EcoString> { support_html::render_node(node, options) }
-    fn render_node_to_html_default(node: &Node) -> cmark_writer::writer::HtmlWriteResult<EcoString> { support_html::render_node_default(node) }
+    fn render_node_to_html(
+        node: &Node,
+        options: &HtmlWriterOptions,
+    ) -> cmark_writer::writer::HtmlWriteResult<EcoString> {
+        support_html::render_node(node, options)
+    }
+    fn render_node_to_html_default(
+        node: &Node,
+    ) -> cmark_writer::writer::HtmlWriteResult<EcoString> {
+        support_html::render_node_default(node)
+    }
 
     #[test]
     fn test_paragraph_and_text() {

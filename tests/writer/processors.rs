@@ -1,5 +1,5 @@
-use cmark_writer::writer::processors::{EnhancedInlineProcessor, InlineProcessorConfig};
 use cmark_writer::traits::{ConfigurableProcessor, InlineNodeProcessor};
+use cmark_writer::writer::processors::{EnhancedInlineProcessor, InlineProcessorConfig};
 use cmark_writer::{CommonMarkWriter, Node, ToCommonMark};
 
 #[test]
