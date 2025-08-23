@@ -2,17 +2,19 @@ use super::{utils, HtmlWriteError, HtmlWriteResult, HtmlWriterOptions};
 use crate::ast::{HtmlElement, ListItem, Node};
 #[cfg(feature = "gfm")]
 use crate::ast::{TableAlignment, TaskListStatus};
+use crate::writer::context::NewlineContext;
 use ecow::EcoString;
 use html_escape;
 use log;
 
-/// HTML writer for serializing CommonMark AST nodes to HTML.
+/// HTML writer with flexible newline control for serializing CommonMark AST nodes to HTML.
 ///
-/// `HtmlWriter` provides a flexible API for generating HTML content from AST nodes. It can be used:
+/// `HtmlWriter` provides a flexible API for generating HTML content from AST nodes with context-aware
+/// newline handling. It can be used:
 /// - Directly with individual nodes through methods like `write_node`
 /// - For building HTML elements programmatically using the tag and attribute methods
 /// - As part of the CommonMarkWriter's HTML rendering process
-/// - Calling HtmlWriter API directly in custom node implementations (use of `html_impl` attribute is no longer recommended)
+/// - With different rendering contexts for inline, block, and mixed content scenarios
 ///
 /// # Examples
 ///
@@ -59,6 +61,8 @@ pub struct HtmlWriter {
     buffer: EcoString,
     /// Whether a tag is currently opened
     tag_opened: bool,
+    /// Current rendering context for flexible newline control
+    context: NewlineContext,
 }
 
 impl HtmlWriter {
@@ -73,6 +77,17 @@ impl HtmlWriter {
             options,
             buffer: EcoString::new(),
             tag_opened: false,
+            context: NewlineContext::block(), // Default to block context for HTML
+        }
+    }
+
+    /// Create a writer with a specific rendering context
+    pub fn with_context(options: HtmlWriterOptions, context: NewlineContext) -> Self {
+        HtmlWriter {
+            options,
+            buffer: EcoString::new(),
+            tag_opened: false,
+            context,
         }
     }
 
@@ -89,6 +104,31 @@ impl HtmlWriter {
     /// Gets a mutable reference to the current options.
     pub fn options_mut(&mut self) -> &mut HtmlWriterOptions {
         &mut self.options
+    }
+
+    /// Get current rendering context
+    pub fn context(&self) -> &NewlineContext {
+        &self.context
+    }
+
+    /// Set new rendering context
+    pub fn set_context(&mut self, context: NewlineContext) {
+        self.context = context;
+    }
+
+    /// Execute a closure with a temporary context
+    pub fn with_temporary_context<F, R>(
+        &mut self,
+        context: NewlineContext,
+        f: F,
+    ) -> HtmlWriteResult<R>
+    where
+        F: FnOnce(&mut Self) -> HtmlWriteResult<R>,
+    {
+        let original_context = std::mem::replace(&mut self.context, context);
+        let result = f(self);
+        self.context = original_context;
+        result
     }
 
     /// Creates a new writer with modified options using a closure.

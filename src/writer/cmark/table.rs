@@ -46,7 +46,7 @@ impl CommonMarkWriter {
         for header in headers {
             self.check_no_newline(header, "Table Header")?;
             self.write_char(' ')?;
-            self.write_node_internal(header)?;
+            self.write_node_content(header)?;
             self.write_str(" |")?;
         }
         self.write_char('\n')?;
@@ -64,14 +64,13 @@ impl CommonMarkWriter {
             for cell in row {
                 self.check_no_newline(cell, "Table Cell")?;
                 self.write_char(' ')?;
-                self.write_node_internal(cell)?;
+                self.write_node_content(cell)?;
                 self.write_str(" |")?;
             }
             self.write_char('\n')?;
         }
 
-        // Always add trailing newline for tables
-        self.write_char('\n')?;
+        // Don't add extra trailing newline - let the context system handle it
         Ok(())
     }
 
@@ -109,7 +108,7 @@ impl CommonMarkWriter {
         for header in headers {
             self.check_no_newline(header, "Table Header")?;
             self.write_char(' ')?;
-            self.write_node_internal(header)?;
+            self.write_node_content(header)?;
             self.write_str(" |")?;
         }
         self.write_char('\n')?;
@@ -141,14 +140,13 @@ impl CommonMarkWriter {
             for cell in row {
                 self.check_no_newline(cell, "Table Cell")?;
                 self.write_char(' ')?;
-                self.write_node_internal(cell)?;
+                self.write_node_content(cell)?;
                 self.write_str(" |")?;
             }
             self.write_char('\n')?;
         }
 
-        // Always add trailing newline for tables
-        self.write_char('\n')?;
+        // Don't add extra trailing newline - let the context system handle it
         Ok(())
     }
 }

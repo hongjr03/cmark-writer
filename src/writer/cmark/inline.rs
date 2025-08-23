@@ -47,7 +47,7 @@ impl CommonMarkWriter {
         if !self.options.enable_gfm || !self.options.gfm_strikethrough {
             // If GFM strikethrough is disabled, just write the content without strikethrough
             for node in content.iter() {
-                self.write_node_internal(node)?;
+                self.write_node_content(node)?;
             }
             return Ok(());
         }
@@ -69,7 +69,7 @@ impl CommonMarkWriter {
         self.write_char('[')?;
 
         for node in content {
-            self.write_node_internal(node)?;
+            self.write_node_content(node)?;
         }
 
         self.write_str("](")?;
@@ -101,7 +101,7 @@ impl CommonMarkWriter {
 
         // Write alt text content
         for node in alt {
-            self.write_node_internal(node)?;
+            self.write_node_content(node)?;
         }
 
         self.write_str("](")?;
@@ -197,30 +197,6 @@ impl CommonMarkWriter {
         Ok(())
     }
 
-    /// Write a link reference definition
-    pub fn write_link_reference_definition(
-        &mut self,
-        label: &str,
-        destination: &str,
-        title: &Option<EcoString>,
-    ) -> WriteResult<()> {
-        // Format: [label]: destination "optional title"
-        self.write_char('[')?;
-        self.write_str(label)?;
-        self.write_str("]: ")?;
-        self.write_str(destination)?;
-
-        if let Some(title_text) = title {
-            self.write_str(" \"")?;
-            self.write_str(title_text)?;
-            self.write_char('"')?;
-        }
-
-        // Always add trailing newline for link reference definitions
-        self.write_char('\n')?;
-        Ok(())
-    }
-
     /// Write a reference link
     pub fn write_reference_link(&mut self, label: &str, content: &[Node]) -> WriteResult<()> {
         // Check for newlines in content
@@ -251,7 +227,7 @@ impl CommonMarkWriter {
             self.write_char('[')?;
 
             for node in content {
-                self.write_node_internal(node)?;
+                self.write_node_content(node)?;
             }
 
             self.write_str("][")?;
