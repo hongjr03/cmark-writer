@@ -2,6 +2,66 @@
 
 All notable changes to the cmark-writer project will be documented in this file.
 
+## [0.8.0] - 2025-08-23
+
+### Major Changes
+
+#### Traits System Modernization
+- **BREAKING CHANGE**: Removed legacy `CustomNode` trait and `custom_node` macro
+- **NEW**: Modular trait organization under `src/traits/` with clear separation by theme (core, formatting, processing, utils)
+- **NEW**: Direct `Format<W>` trait implementations for custom nodes replacing legacy approach
+- **NEW**: Unified formatting interface with consistent naming and automatic bridging between abstraction levels
+
+#### Custom Node Architecture Overhaul
+- **NEW**: `CommonMarkOnly` derive macro for automatic `MultiFormat` trait implementation with HTML fallback
+- **IMPROVED**: Simplified custom node implementation with idiomatic Rust trait-based approach
+- **IMPROVED**: Better examples and documentation for both CommonMark and HTML custom node implementations
+
+#### Block-level Writing Logic Refactor
+- **NEW**: Context-based system for managing newlines and indentation (`NewlineContext`)
+- **IMPROVED**: Flexible control over trailing newlines, indentation, and context handling
+- **IMPROVED**: Enhanced list writing logic with custom numbering, tight/loose spacing, and better GFM task list support
+- **IMPROVED**: Simplified code block rendering with standardized fence usage
+
+### Features
+
+#### Error Handling Enhancement
+- **NEW**: Structured error macros (`structure_error`, `coded_error`) for custom error types
+- **NEW**: Error types with codes and formatted messages for document validation and syntax errors
+
+#### API Improvements
+- **NEW**: `type_name` method added to `Node` struct for easier debugging and error messages
+- **IMPROVED**: Context-aware writing methods for better output consistency
+- **IMPROVED**: Better documentation and migration guides
+
+#### Test Suite Improvements
+- **IMPROVED**: Comprehensive test suite restructuring and organization
+- **IMPROVED**: Better test isolation with modular test organization
+- **IMPROVED**: Enhanced HTML rendering test helpers and shared support modules
+- **IMPROVED**: Better coverage for AST nodes and error handling
+
+### Dependencies
+
+- Updated `ecow` crate from `0.2.5` to `0.2.6`
+
+### Migration Guide
+
+- **Custom Nodes**: Replace `CustomNode` trait implementations with direct `Format<CommonMarkWriter>` and/or `Format<HtmlWriter>` implementations
+- **Trait Imports**: Update trait imports to use the new modular organization under `src/traits/`
+- **CommonMark-only Nodes**: Consider using the new `CommonMarkOnly` derive macro for simplified implementation
+
+### Backward Compatibility
+
+- Public APIs remain backward compatible through re-exports
+- Legacy files preserved for reference during migration
+- Comprehensive migration documentation provided
+
+### Documentation
+
+- **UPDATED**: README.md with new trait-based approach examples
+- **NEW**: Usage examples for `CommonMarkOnly` derive macro
+- **IMPROVED**: Error handling documentation with practical examples
+
 ## [0.7.9] - 2025-07-01
 
 ### Features
