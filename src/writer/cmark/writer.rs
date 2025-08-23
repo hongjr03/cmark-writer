@@ -361,7 +361,7 @@ impl CommonMarkWriter {
     /// Pop the current context (for stack-based context management in tests)
     pub fn pop_context(&mut self) -> Option<NewlineContext> {
         // Return to default context
-        let old = std::mem::replace(&mut self.context, NewlineContext::block());
+        let old = std::mem::take(&mut self.context);
         Some(old)
     }
 
