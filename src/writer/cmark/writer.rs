@@ -3,18 +3,22 @@
 use crate::ast::{CustomNode, Node};
 use crate::error::{WriteError, WriteResult};
 use crate::options::WriterOptions;
+use crate::writer::context::{NewlineContext, NewlineStrategy, RenderingMode};
 use ecow::EcoString;
 use std::fmt;
 
-/// CommonMark writer
+/// CommonMark writer with flexible newline control
 ///
-/// This struct is responsible for serializing AST nodes to CommonMark-compliant text.
+/// This writer uses a context-based system for intelligent newline handling,
+/// allowing fine-grained control over formatting in different scenarios.
 #[derive(Debug)]
 pub struct CommonMarkWriter {
     /// Writer options
     pub options: WriterOptions,
     /// Buffer for storing the output text
     pub(super) buffer: EcoString,
+    /// Current rendering context
+    context: NewlineContext,
 }
 
 impl CommonMarkWriter {
@@ -59,6 +63,16 @@ impl CommonMarkWriter {
         Self {
             options,
             buffer: EcoString::new(),
+            context: NewlineContext::block(),
+        }
+    }
+
+    /// Create a writer with a specific rendering context
+    pub fn with_context(options: WriterOptions, context: NewlineContext) -> Self {
+        Self {
+            options,
+            buffer: EcoString::new(),
+            context,
         }
     }
 
@@ -108,24 +122,30 @@ impl CommonMarkWriter {
 
     /// Write document children with proper spacing
     pub(super) fn write_document_children(&mut self, children: &[Node]) -> WriteResult<()> {
-        for (i, child) in children.iter().enumerate() {
+        for (i, node) in children.iter().enumerate() {
             if i > 0 {
-                let prev_child = &children[i - 1];
-                if prev_child.is_block() && child.is_block() {
-                    // Add one extra newline since each block element already has one trailing newline
-                    self.write_char('\n')?;
-                }
+                self.write_node_separator(&children[i - 1], node)?;
             }
 
-            // 写入节点本身，块级元素已经有了尾随换行符
-            self.write_node_internal(child)?;
+            // For the last child, be selective about trailing newlines
+            if i == children.len() - 1 {
+                // If it's a block element, add trailing newline
+                if node.is_block() {
+                    self.write_node(node)?;
+                } else {
+                    // For inline elements, don't add trailing newline
+                    self.write_node_content(node)?;
+                }
+            } else {
+                self.write_node(node)?;
+            }
         }
-
         Ok(())
     }
 
-    /// 内部节点写入方法
-    pub fn write_node_internal(&mut self, node: &Node) -> WriteResult<()> {
+    /// Write node content without context-aware newline handling
+    /// This is called by write_node() which handles the newline logic
+    pub fn write_node_content(&mut self, node: &Node) -> WriteResult<()> {
         // 处理自定义节点
         if let Node::Custom(custom_node) = node {
             // Ensure that CustomNode trait requires render_commonmark method
@@ -184,7 +204,7 @@ impl CommonMarkWriter {
                 block_type,
             } => self.write_code_block(language, content, block_type),
             Node::UnorderedList(items) => self.write_unordered_list(items),
-            Node::OrderedList { start, items } => self.write_ordered_list(*start, items),
+            Node::OrderedList { start, items } => self.write_ordered_list(items, *start, true), // Default to tight
             Node::ThematicBreak => self.write_thematic_break(),
 
             // Inline elements
@@ -316,12 +336,167 @@ impl CommonMarkWriter {
         Ok(())
     }
 
-    /// Ensure content ends with a newline (for consistent handling at the end of block nodes)
-    ///
-    /// Adds a newline character if the content doesn't already end with one; does nothing if it already ends with a newline
-    pub fn ensure_trailing_newline(&mut self) -> WriteResult<()> {
+    /// Get current rendering context
+    pub fn context(&self) -> &NewlineContext {
+        &self.context
+    }
+
+    /// Get current rendering context (alias for backwards compatibility with tests)
+    pub fn current_context(&self) -> &NewlineContext {
+        &self.context
+    }
+
+    /// Set new rendering context
+    pub fn set_context(&mut self, context: NewlineContext) {
+        self.context = context;
+    }
+
+    /// Push a new context (for stack-based context management in tests)
+    pub fn push_context(&mut self, context: NewlineContext) {
+        // For simplicity in tests, just replace current context
+        // In the future, we could implement a real stack if needed
+        self.context = context;
+    }
+
+    /// Pop the current context (for stack-based context management in tests)
+    pub fn pop_context(&mut self) -> Option<NewlineContext> {
+        // Return to default context
+        let old = std::mem::replace(&mut self.context, NewlineContext::block());
+        Some(old)
+    }
+
+    /// Execute a closure with a temporary context
+    pub fn with_temporary_context<F, R>(&mut self, context: NewlineContext, f: F) -> WriteResult<R>
+    where
+        F: FnOnce(&mut Self) -> WriteResult<R>,
+    {
+        let original_context = std::mem::replace(&mut self.context, context);
+        let result = f(self);
+        self.context = original_context;
+        result
+    }
+
+    /// Execute a closure with a temporary context (alias for examples)
+    pub fn with_temp_context<F, R>(&mut self, context: NewlineContext, f: F) -> WriteResult<R>
+    where
+        F: FnOnce(&mut Self) -> WriteResult<R>,
+    {
+        self.with_temporary_context(context, f)
+    }
+
+    /// Write a single node with context-aware formatting
+    pub fn write_node(&mut self, node: &Node) -> WriteResult<()> {
+        // Handle document nodes specially - they manage their own newlines
+        if let Node::Document(children) = node {
+            return self.write_document_children(children);
+        }
+
+        // Validate node is allowed in current context
+        self.context.validate_node(node)?;
+
+        // Remember buffer state before writing
+        let buffer_start = self.buffer.len();
+
+        // Write the actual node content
+        self.write_node_content(node)?;
+
+        // Get the content that was just written
+        let new_content = &self.buffer[buffer_start..];
+
+        // Apply context-aware trailing newline logic
+        if self
+            .context
+            .should_add_trailing_newline(new_content, Some(node))
+        {
+            self.write_char('\n')?;
+        }
+
+        Ok(())
+    }
+
+    /// Write multiple nodes with intelligent spacing
+    pub fn write_nodes(&mut self, nodes: &[Node]) -> WriteResult<()> {
+        for (i, node) in nodes.iter().enumerate() {
+            if i > 0 {
+                self.write_node_separator(&nodes[i - 1], node)?;
+            }
+            self.write_node(node)?;
+        }
+        Ok(())
+    }
+
+    /// Write multiple nodes with intelligent spacing (alias for examples)
+    pub fn write_nodes_with_context(&mut self, nodes: &[Node]) -> WriteResult<()> {
+        self.write_nodes(nodes)
+    }
+
+    /// Write content with a specific node context (for examples)
+    pub fn write_content_with_context(
+        &mut self,
+        _node: &Node,
+        content_fn: impl FnOnce(&mut Self) -> WriteResult<()>,
+    ) -> WriteResult<()> {
+        content_fn(self)
+    }
+
+    /// Write separator between nodes based on context
+    fn write_node_separator(&mut self, prev_node: &Node, current_node: &Node) -> WriteResult<()> {
+        match self.context.mode {
+            RenderingMode::Block => {
+                // Traditional block spacing
+                if prev_node.is_block() && current_node.is_block() {
+                    self.ensure_double_newline()?;
+                }
+            }
+            RenderingMode::InlineWithBlocks => {
+                // Smart spacing for mixed content
+                if prev_node.is_block() || current_node.is_block() {
+                    self.ensure_single_newline()?;
+                }
+            }
+            RenderingMode::PureInline => {
+                // No automatic spacing
+            }
+            RenderingMode::TableCell => {
+                // Space separation
+                if !self.buffer.ends_with(' ') && !self.buffer.is_empty() {
+                    self.write_char(' ')?;
+                }
+            }
+            RenderingMode::ListItem => {
+                // Conditional newlines for list items
+                if prev_node.is_block() && current_node.is_block() {
+                    self.ensure_single_newline()?;
+                }
+            }
+            RenderingMode::Custom => {
+                // Custom logic based on strategy
+                if (prev_node.is_block() || current_node.is_block())
+                    && self.context.strategy == NewlineStrategy::Always
+                {
+                    self.ensure_single_newline()?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Ensure buffer ends with a single newline
+    fn ensure_single_newline(&mut self) -> WriteResult<()> {
         if !self.buffer.ends_with('\n') {
             self.write_char('\n')?;
+        }
+        Ok(())
+    }
+
+    /// Ensure buffer ends with a double newline
+    fn ensure_double_newline(&mut self) -> WriteResult<()> {
+        if self.buffer.ends_with("\n\n") {
+            // Already has double newline
+        } else if self.buffer.ends_with('\n') {
+            self.write_char('\n')?;
+        } else {
+            self.write_str("\n\n")?;
         }
         Ok(())
     }
@@ -330,10 +505,14 @@ impl CommonMarkWriter {
     pub(super) fn write_delimited(&mut self, content: &[Node], delimiter: &str) -> WriteResult<()> {
         self.write_str(delimiter)?;
 
+        // Use pure inline context for delimited content (like emphasis, strong, etc.)
+        let original_context = std::mem::replace(&mut self.context, NewlineContext::pure_inline());
+
         for node in content {
-            self.write_node_internal(node)?;
+            self.write_node_content(node)?;
         }
 
+        self.context = original_context;
         self.write_str(delimiter)?;
         Ok(())
     }
@@ -349,7 +528,13 @@ impl Default for CommonMarkWriter {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut writer = CommonMarkWriter::new();
-        match writer.write_node_internal(self) {
+        let result = if self.is_block() {
+            writer.write_node(self)
+        } else {
+            // For inline elements, don't add automatic trailing newlines
+            writer.write_node_content(self)
+        };
+        match result {
             Ok(_) => write!(f, "{}", writer.into_string()),
             Err(e) => write!(f, "Error writing Node: {}", e),
         }

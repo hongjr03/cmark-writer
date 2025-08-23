@@ -99,7 +99,7 @@ impl NodeProcessor for EnhancedBlockProcessor {
                     if i > 0 {
                         writer.write_str("\n\n")?;
                     }
-                    writer.write_node_internal(child)?;
+                    writer.write_node(child)?;
                 }
                 Ok(())
             }
@@ -116,7 +116,7 @@ impl NodeProcessor for EnhancedBlockProcessor {
                 block_type,
             } => writer.write_code_block(language, content, block_type),
             Node::UnorderedList(items) => writer.write_unordered_list(items),
-            Node::OrderedList { start, items } => writer.write_ordered_list(*start, items),
+            Node::OrderedList { start, items } => writer.write_ordered_list(items, *start, true),
             Node::ThematicBreak => writer.write_thematic_break(),
             #[cfg(feature = "gfm")]
             Node::Table {
@@ -140,7 +140,7 @@ impl NodeProcessor for EnhancedBlockProcessor {
         }?;
 
         if self.config.ensure_trailing_newlines {
-            writer.ensure_trailing_newline()?;
+            // Newline handling is now context-aware and automatic
         }
 
         Ok(())
@@ -407,7 +407,7 @@ impl NodeProcessor for CustomNodeProcessor {
                 custom_node.render_commonmark(writer)?;
 
                 if custom_node.is_block() {
-                    writer.ensure_trailing_newline()?;
+                    // Newline handling is now context-aware and automatic
                 }
 
                 Ok(())

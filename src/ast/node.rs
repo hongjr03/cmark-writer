@@ -529,6 +529,37 @@ impl Node {
                 | Node::Custom(_)
         )
     }
+
+    /// Get the type name of the node for debugging and error messages
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Node::Document(_) => "Document",
+            Node::ThematicBreak => "ThematicBreak",
+            Node::Heading { .. } => "Heading",
+            Node::CodeBlock { .. } => "CodeBlock",
+            Node::HtmlBlock(_) => "HtmlBlock",
+            Node::LinkReferenceDefinition { .. } => "LinkReferenceDefinition",
+            Node::Paragraph(_) => "Paragraph",
+            Node::BlockQuote(_) => "BlockQuote",
+            Node::OrderedList { .. } => "OrderedList",
+            Node::UnorderedList(_) => "UnorderedList",
+            Node::Table { .. } => "Table",
+            Node::InlineCode(_) => "InlineCode",
+            Node::Emphasis(_) => "Emphasis",
+            Node::Strong(_) => "Strong",
+            Node::Strikethrough(_) => "Strikethrough",
+            Node::Link { .. } => "Link",
+            Node::ReferenceLink { .. } => "ReferenceLink",
+            Node::Image { .. } => "Image",
+            Node::Autolink { .. } => "Autolink",
+            Node::ExtendedAutolink(_) => "ExtendedAutolink",
+            Node::HtmlElement(_) => "HtmlElement",
+            Node::HardBreak => "HardBreak",
+            Node::SoftBreak => "SoftBreak",
+            Node::Text(_) => "Text",
+            Node::Custom(_) => "Custom",
+        }
+    }
     /// Create a heading node
     ///
     /// # Arguments
@@ -627,7 +658,14 @@ impl crate::traits::Format<crate::writer::CommonMarkWriter> for Node {
         &self,
         writer: &mut crate::writer::CommonMarkWriter,
     ) -> crate::error::WriteResult<()> {
-        writer.write_node_internal(self)
+        // For individual nodes being formatted directly (like in legacy tests),
+        // use content writing without automatic trailing newlines unless it's a block
+        if self.is_block() {
+            writer.write_node(self)
+        } else {
+            // For inline elements, write content without automatic trailing newlines
+            writer.write_node_content(self)
+        }
     }
 }
 
